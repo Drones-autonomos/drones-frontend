@@ -1,0 +1,1193 @@
+.admin-live-page {
+  width: min(100%, 768px);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  color: #1d273b;
+  background: #faf8ff;
+}
+
+.live-header {
+  min-height: 124px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 40px;
+  border-bottom: 2px solid #e8eaff;
+  background: #fff;
+}
+
+.live-header__brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.live-header__drone-icon {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  display: grid;
+  place-items: center;
+  border: 4px solid #0074ad;
+  border-radius: 50%;
+  color: #0074ad;
+}
+
+.live-header__drone-icon svg {
+  width: 40px;
+  height: 40px;
+  fill: currentColor;
+}
+
+.live-header__drone-icon > span {
+  position: absolute;
+  right: -5px;
+  bottom: -3px;
+  width: 25px;
+  height: 25px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #007954;
+}
+
+.live-header__brand-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.live-header__brand-copy > h1 {
+  overflow: hidden;
+  margin: 0;
+  color: #151d2f;
+  font-size: 34px;
+  font-weight: 750;
+  letter-spacing: -.5px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-header__brand-copy > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #5a6069;
+  font-size: 23px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.live-header__brand-copy i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5b6268;
+}
+
+.live-header__brand-copy b {
+  color: #007b59;
+  font-weight: 650;
+}
+
+.live-header__signal {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 20px;
+  border-radius: 999px;
+  color: #007b5a;
+  background: #b6f8df;
+  font-size: 22px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.live-header__signal > svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.live-header__signal small {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgb(0 121 84 / 11%);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.live-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 31px;
+  padding: 30px 40px 88px;
+}
+
+.flight-card {
+  min-height: 142px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 27px;
+  border: 2px solid #e9eaff;
+  border-radius: 40px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(34 45 77 / 6%);
+}
+
+.flight-card__icon {
+  width: 70px;
+  height: 70px;
+  flex: 0 0 70px;
+  display: grid;
+  place-items: center;
+  border-radius: 24px;
+  color: #006a9f;
+  background: #cbe6ff;
+}
+
+.flight-card__icon svg {
+  width: 39px;
+  height: 39px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.flight-card__details {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.flight-card__eyebrow {
+  color: #006399;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  line-height: 1.2;
+}
+
+.flight-card__details > strong {
+  overflow: hidden;
+  color: #151d2f;
+  font-size: 27px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flight-card__milestone {
+  flex: 0 0 auto;
+  padding: 10px 19px;
+  border-radius: 999px;
+  color: #505968;
+  background: #eceeff;
+  font-size: 22px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.flight-card__milestone strong {
+  color: #00649c;
+  font-weight: 800;
+}
+
+.live-preview-section {
+  min-width: 0;
+}
+
+.live-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 2px solid #dfe9f1;
+  border-radius: 54px;
+  background: #8da49b;
+  box-shadow: 0 13px 22px rgb(33 43 57 / 14%);
+  isolation: isolate;
+}
+
+.live-preview:fullscreen {
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+}
+
+.live-preview__image {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.live-preview::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(19 35 41 / 24%), transparent 29%, transparent 64%, rgb(20 30 17 / 27%));
+  content: '';
+}
+
+.preview-topline {
+  position: absolute;
+  top: 24px;
+  right: 23px;
+  left: 23px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preview-live-indicator,
+.preview-quality,
+.preview-encryption {
+  min-height: 49px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.preview-live-indicator {
+  background: #df3658;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.preview-live-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.preview-quality,
+.preview-encryption {
+  background: rgb(57 66 69 / 61%);
+  backdrop-filter: blur(5px);
+}
+
+.preview-encryption {
+  font-weight: 500;
+}
+
+.preview-encryption svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: #54f0bc;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.preview-demo-note {
+  position: absolute;
+  top: 83px;
+  left: 50%;
+  max-width: calc(100% - 32px);
+  padding: 5px 10px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(255 255 255 / 55%);
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(33 44 47 / 58%);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .3px;
+  text-align: center;
+  white-space: nowrap;
+  backdrop-filter: blur(5px);
+}
+
+.preview-crosshair {
+  position: absolute;
+  top: 22%;
+  left: 30%;
+  width: 40%;
+  height: 48%;
+  display: grid;
+  place-items: center;
+  border: 4px dashed rgb(255 255 255 / 83%);
+  border-radius: 28px;
+}
+
+.preview-crosshair span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 0 12px rgb(255 255 255 / 50%);
+}
+
+.preview-area-status {
+  position: absolute;
+  bottom: 20%;
+  left: 50%;
+  min-width: 290px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 10px 20px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(228 232 237 / 90%);
+  border-radius: 999px;
+  color: #1d273b;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 4px 10px rgb(24 37 47 / 16%);
+}
+
+.preview-area-dot {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 50%;
+  background: #007b59;
+}
+
+.preview-area-status > span:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.preview-area-status strong {
+  font-weight: 750;
+}
+
+.preview-area-status > span:last-child > span {
+  font-weight: 650;
+}
+
+.preview-readings {
+  position: absolute;
+  right: 20px;
+  bottom: 23px;
+  left: 23px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.preview-reading {
+  min-height: 51px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(50 56 13 / 79%);
+  font-size: 19px;
+  white-space: nowrap;
+}
+
+.preview-reading svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.preview-fullscreen {
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(50 56 13 / 70%);
+  cursor: pointer;
+}
+
+.preview-fullscreen svg {
+  width: 29px;
+  height: 29px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.preview-fullscreen:focus-visible,
+.drone-action:focus-visible {
+  outline: 3px solid #007eb4;
+  outline-offset: 3px;
+}
+
+.preview-message {
+  margin: 9px 5px 0;
+  color: #8b3844;
+  font-size: 14px;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.telemetry-card {
+  min-width: 0;
+  min-height: 171px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 6px;
+  border: 2px solid #e9eaff;
+  border-radius: 39px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(34 45 77 / 5%);
+  text-align: center;
+}
+
+.telemetry-card__icon {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  color: #0876a9;
+  background: #e2f1ff;
+}
+
+.telemetry-card__icon svg {
+  width: 33px;
+  height: 33px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.telemetry-card--battery .telemetry-card__icon {
+  color: #007b54;
+  background: #fff;
+}
+
+.telemetry-card--battery .telemetry-card__icon::before {
+  position: absolute;
+  inset: 2px;
+  border: 5px dashed #007b54;
+  border-radius: 50%;
+  content: '';
+  mask-image: conic-gradient(#000 0 78%, transparent 78% 100%);
+}
+
+.telemetry-card--battery .telemetry-card__icon svg {
+  width: 29px;
+  height: 29px;
+  stroke-width: 2.7;
+}
+
+.telemetry-card--wind .telemetry-card__icon {
+  color: #b55b13;
+  background: #fff2c9;
+}
+
+.telemetry-card--gps .telemetry-card__icon {
+  color: #00669a;
+  background: #eaedff;
+}
+
+.telemetry-card__value {
+  max-width: 100%;
+  overflow: hidden;
+  color: #20293c;
+  font-size: 22px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telemetry-card__detail {
+  margin-top: 3px;
+  color: #626873;
+  font-size: 18px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.telemetry-card__detail.is-ok {
+  color: #007b59;
+  font-weight: 650;
+}
+
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.quick-actions__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 8px;
+}
+
+.quick-actions__heading h2 {
+  margin: 0;
+  color: #1d273b;
+  font-size: 27px;
+  font-weight: 750;
+  letter-spacing: -.5px;
+  line-height: 1.2;
+}
+
+.quick-actions__heading > span {
+  padding: 8px 18px;
+  border-radius: 999px;
+  color: #00649c;
+  background: #cce7ff;
+  font-size: 18px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.quick-actions__buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.drone-action {
+  min-width: 0;
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  border: 2px solid #e9eaff;
+  border-radius: 40px;
+  color: #1d273b;
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(34 45 77 / 6%);
+  font: inherit;
+  font-size: 21px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.drone-action__icon {
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #e77a00;
+  background: #fff9e9;
+}
+
+.drone-action__icon svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.drone-action:nth-child(2) .drone-action__icon {
+  color: #00699f;
+  background: #d3ebff;
+}
+
+.drone-action--emergency {
+  min-height: 77px;
+  grid-column: 1 / -1;
+  border: 0;
+  border-radius: 999px;
+  color: #bd1645;
+  background: #ffd9dc;
+  box-shadow: none;
+  font-size: 21px;
+}
+
+.drone-action--emergency .drone-action__icon {
+  width: 31px;
+  height: 31px;
+  flex-basis: 31px;
+  color: #c81548;
+  background: transparent;
+}
+
+.drone-action--emergency .drone-action__icon svg {
+  width: 29px;
+  height: 29px;
+}
+
+.drone-action-message {
+  grid-column: 1 / -1;
+  margin: -10px 7px 0;
+  color: #9c3042;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.heliport-card {
+  padding: 29px 30px 25px;
+  border: 2px solid #e9eaff;
+  border-radius: 54px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(34 45 77 / 5%);
+}
+
+.heliport-card__main {
+  min-height: 93px;
+  display: flex;
+  align-items: center;
+  gap: 23px;
+}
+
+.heliport-card__icon {
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #007b59;
+  background: #b5f8df;
+}
+
+.heliport-card__icon svg {
+  width: 39px;
+  height: 39px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+}
+
+.heliport-card__details {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.heliport-card__details strong {
+  overflow: hidden;
+  color: #1d273b;
+  font-size: 27px;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heliport-card__details > span {
+  color: #5c626b;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.heliport-card__availability {
+  flex: 0 0 auto;
+  padding: 11px 20px;
+  border-radius: 999px;
+  color: #007b59;
+  background: #b5f8df;
+  font-size: 19px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.heliport-card__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 17px;
+  border-top: 2px solid #e9eaff;
+  color: #606670;
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.heliport-card__status > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.heliport-card__status svg {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  fill: none;
+  stroke: #007b59;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.heliport-card__status strong {
+  color: #00649c;
+  font-size: 19px;
+  font-weight: 750;
+  text-align: right;
+}
+
+@media (max-width: 620px) {
+  .live-header {
+    min-height: 93px;
+    gap: 8px;
+    padding: 13px 20px;
+  }
+
+  .live-header__brand {
+    gap: 12px;
+  }
+
+  .live-header__drone-icon {
+    width: 57px;
+    height: 57px;
+    flex-basis: 57px;
+    border-width: 3px;
+  }
+
+  .live-header__drone-icon svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .live-header__drone-icon > span {
+    width: 20px;
+    height: 20px;
+  }
+
+  .live-header__brand-copy > h1 {
+    font-size: clamp(20px, 5vw, 27px);
+  }
+
+  .live-header__brand-copy > span {
+    gap: 6px;
+    font-size: clamp(13px, 3.4vw, 17px);
+  }
+
+  .live-header__brand-copy i {
+    width: 5px;
+    height: 5px;
+  }
+
+  .live-header__signal {
+    gap: 5px;
+    padding: 10px 12px;
+    font-size: clamp(12px, 3.3vw, 16px);
+  }
+
+  .live-header__signal > svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .live-header__signal small {
+    padding: 2px 4px;
+    font-size: 8px;
+  }
+
+  .live-content {
+    gap: 20px;
+    padding: 20px 20px 72px;
+  }
+
+  .flight-card {
+    min-height: 107px;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 30px;
+  }
+
+  .flight-card__icon {
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px;
+    border-radius: 19px;
+  }
+
+  .flight-card__icon svg {
+    width: 31px;
+    height: 31px;
+  }
+
+  .flight-card__details {
+    gap: 5px;
+  }
+
+  .flight-card__eyebrow {
+    font-size: 15px;
+  }
+
+  .flight-card__details > strong {
+    font-size: clamp(16px, 4vw, 21px);
+  }
+
+  .flight-card__milestone {
+    padding: 8px 11px;
+    font-size: clamp(13px, 3.4vw, 17px);
+  }
+
+  .live-preview {
+    border-radius: 36px;
+  }
+
+  .preview-topline {
+    top: 13px;
+    right: 12px;
+    left: 12px;
+    gap: 5px;
+  }
+
+  .preview-live-indicator,
+  .preview-quality,
+  .preview-encryption {
+    min-height: 34px;
+    gap: 5px;
+    padding: 0 10px;
+    font-size: clamp(10px, 2.9vw, 14px);
+  }
+
+  .preview-live-indicator {
+    font-size: clamp(11px, 3vw, 15px);
+  }
+
+  .preview-live-dot {
+    width: 8px;
+    height: 8px;
+  }
+
+  .preview-encryption svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .preview-demo-note {
+    top: 53px;
+    padding: 3px 7px;
+    font-size: clamp(7px, 1.9vw, 10px);
+  }
+
+  .preview-crosshair {
+    border-width: 3px;
+    border-radius: 20px;
+  }
+
+  .preview-crosshair span {
+    width: 13px;
+    height: 13px;
+  }
+
+  .preview-area-status {
+    bottom: 20%;
+    min-width: 0;
+    gap: 9px;
+    padding: 7px 13px;
+  }
+
+  .preview-area-dot {
+    width: 11px;
+    height: 11px;
+    flex-basis: 11px;
+  }
+
+  .preview-area-status > span:last-child {
+    font-size: clamp(13px, 3.5vw, 17px);
+  }
+
+  .preview-readings {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    gap: 7px;
+  }
+
+  .preview-reading {
+    min-height: 35px;
+    gap: 5px;
+    padding: 0 10px;
+    font-size: clamp(9px, 2.7vw, 13px);
+  }
+
+  .preview-reading svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .preview-fullscreen {
+    right: 12px;
+    bottom: 11px;
+    width: 41px;
+    height: 41px;
+  }
+
+  .preview-fullscreen svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .telemetry-grid {
+    gap: 10px;
+  }
+
+  .telemetry-card {
+    min-height: 132px;
+    padding: 9px 3px;
+    border-radius: 27px;
+  }
+
+  .telemetry-card__icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 6px;
+  }
+
+  .telemetry-card__icon svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .telemetry-card--battery .telemetry-card__icon::before {
+    border-width: 4px;
+  }
+
+  .telemetry-card--battery .telemetry-card__icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .telemetry-card__value {
+    font-size: clamp(14px, 3.7vw, 18px);
+  }
+
+  .telemetry-card__detail {
+    font-size: clamp(11px, 3vw, 15px);
+  }
+
+  .quick-actions {
+    gap: 15px;
+  }
+
+  .quick-actions__heading {
+    gap: 7px;
+    padding: 0 4px;
+  }
+
+  .quick-actions__heading h2 {
+    font-size: clamp(18px, 4.7vw, 23px);
+  }
+
+  .quick-actions__heading > span {
+    padding: 6px 11px;
+    font-size: clamp(11px, 3vw, 15px);
+  }
+
+  .quick-actions__buttons {
+    gap: 10px;
+  }
+
+  .drone-action {
+    min-height: 84px;
+    gap: 9px;
+    padding: 9px;
+    border-radius: 28px;
+    font-size: clamp(12px, 3.5vw, 17px);
+  }
+
+  .drone-action__icon {
+    width: 47px;
+    height: 47px;
+    flex-basis: 47px;
+  }
+
+  .drone-action__icon svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  .drone-action--emergency {
+    min-height: 59px;
+    border-radius: 999px;
+    font-size: clamp(13px, 3.5vw, 17px);
+  }
+
+  .drone-action--emergency .drone-action__icon {
+    width: 26px;
+    height: 26px;
+    flex-basis: 26px;
+  }
+
+  .drone-action--emergency .drone-action__icon svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  .heliport-card {
+    padding: 19px 18px 17px;
+    border-radius: 38px;
+  }
+
+  .heliport-card__main {
+    min-height: 68px;
+    gap: 12px;
+  }
+
+  .heliport-card__icon {
+    width: 57px;
+    height: 57px;
+    flex-basis: 57px;
+  }
+
+  .heliport-card__icon svg {
+    width: 31px;
+    height: 31px;
+  }
+
+  .heliport-card__details {
+    gap: 3px;
+  }
+
+  .heliport-card__details strong {
+    font-size: clamp(15px, 4vw, 20px);
+  }
+
+  .heliport-card__details > span {
+    font-size: clamp(11px, 3.3vw, 16px);
+  }
+
+  .heliport-card__availability {
+    padding: 8px 10px;
+    font-size: clamp(10px, 2.8vw, 14px);
+  }
+
+  .heliport-card__status {
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 12px;
+    font-size: clamp(11px, 3.2vw, 15px);
+  }
+
+  .heliport-card__status svg {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .heliport-card__status strong {
+    font-size: clamp(11px, 3vw, 15px);
+  }
+}
+
+@media (max-width: 370px) {
+  .live-header {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .live-header__brand {
+    gap: 8px;
+  }
+
+  .live-header__drone-icon {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+  }
+
+  .live-header__signal {
+    padding: 8px 9px;
+  }
+
+  .live-content {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .flight-card {
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .flight-card__icon {
+    width: 45px;
+    height: 45px;
+    flex-basis: 45px;
+  }
+
+  .flight-card__milestone {
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+
+  .preview-topline {
+    right: 8px;
+    left: 8px;
+  }
+
+  .preview-live-indicator,
+  .preview-quality,
+  .preview-encryption {
+    min-height: 29px;
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+
+  .preview-readings {
+    left: 8px;
+    gap: 4px;
+  }
+
+  .preview-reading {
+    padding: 0 7px;
+  }
+}
