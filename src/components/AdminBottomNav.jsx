@@ -16,27 +16,31 @@ const navigationItems = [
   { to: '/admin/ajustes', label: 'Ajustes', Icon: SettingsIcon },
 ]
 
-function AdminBottomNav({ pendingAlerts = 0 }) {
+function AdminBottomNav({ pendingAlerts = 0, activePath = null }) {
   return (
     <nav className="admin-bottom-nav" aria-label="Navegación de administrador">
-      {navigationItems.map(({ to, label, Icon, showBadge }) => (
-        <NavLink
-          key={to}
-          className={({ isActive }) => `admin-nav-link${isActive ? ' is-active' : ''}`}
-          to={to}
-          end={to === '/admin/live'}
-        >
-          <span className="admin-nav-icon">
-            <Icon />
-            {showBadge && pendingAlerts > 0 && (
-              <span className="admin-nav-badge" aria-label={`${pendingAlerts} alertas pendientes`}>
-                {pendingAlerts}
-              </span>
-            )}
-          </span>
-          <span>{label}</span>
-        </NavLink>
-      ))}
+      {navigationItems.map(({ to, label, Icon, showBadge }) => {
+        return (
+          <NavLink
+            key={to}
+            className={({ isActive }) =>
+              `admin-nav-link${(activePath !== null ? activePath === to : isActive) ? ' is-active' : ''}`
+            }
+            to={to}
+            end={to === '/admin/live'}
+          >
+            <span className="admin-nav-icon">
+              <Icon />
+              {showBadge && pendingAlerts > 0 && (
+                <span className="admin-nav-badge" aria-label={`${pendingAlerts} alertas pendientes`}>
+                  {pendingAlerts}
+                </span>
+              )}
+            </span>
+            <span>{label}</span>
+          </NavLink>
+        )
+      })}
     </nav>
   )
 }

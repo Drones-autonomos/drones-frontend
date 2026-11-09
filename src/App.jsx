@@ -3,6 +3,7 @@ import Ajustes from './pages/Admin/Ajustes.jsx'
 import Alertas from './pages/Admin/Alertas.jsx'
 import Bitacora from './pages/Admin/Bitacora.jsx'
 import EnVivo from './pages/Admin/EnVivo.jsx'
+import ProgramarRuta from './pages/Admin/ProgramarRuta.jsx'
 import Rutas from './pages/Admin/Rutas.jsx'
 import Login from './pages/Login/Login.jsx'
 import Registro from './pages/Registro/Registro.jsx'
@@ -16,6 +17,7 @@ function App() {
         <Route path="/admin/live" element={<EnVivo />} />
         <Route path="/admin/alertas" element={<Alertas />} />
         <Route path="/admin/rutas" element={<Rutas />} />
+        <Route path="/admin/programar-ruta" element={<ProgramarRuta />} />
         <Route path="/admin/bitacora" element={<Bitacora />} />
         <Route path="/admin/ajustes" element={<Ajustes />} />
         <Route path="/registro" element={<Registro />} />

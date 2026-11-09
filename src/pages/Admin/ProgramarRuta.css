@@ -1,0 +1,806 @@
+/* ==========================================================================
+   MÓDULO PROGRAMAR NUEVA RUTA - AEROLUFERAN (Fiel a la captura Figma)
+   ========================================================================== */
+
+.programar-ruta-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: #f0f4f9;
+  color: #172f52;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.programar-ruta-shell {
+  width: min(100%, 460px);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  box-shadow: 0 0 30px rgba(15, 23, 42, 0.06);
+}
+
+/* ==========================================================================
+   ENCABEZADO SUPERIOR
+   ========================================================================== */
+.programar-header-bar {
+  padding: 16px 20px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.programar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.programar-brand-name {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: #172f52;
+  line-height: 1.15;
+  letter-spacing: -0.3px;
+}
+
+/* ==========================================================================
+   SUBHEADER CON BOTÓN ATRÁS
+   ========================================================================== */
+.programar-subhead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px 6px;
+}
+
+.btn-back-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 100ms ease;
+  flex-shrink: 0;
+}
+
+.btn-back-circle:hover {
+  background: #bae6fd;
+}
+
+.btn-back-circle:active {
+  transform: scale(0.95);
+}
+
+.programar-subhead-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  color: #172f52;
+  letter-spacing: -0.3px;
+}
+
+/* ==========================================================================
+   CONTENIDO PRINCIPAL
+   ========================================================================== */
+.programar-content {
+  flex: 1;
+  padding: 12px 16px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   1. CHECKLIST DE VUELO APROBADO
+   ========================================================================== */
+.checklist-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(15, 23, 42, 0.02);
+  border: 1px solid #f1f5f9;
+}
+
+.checklist-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.checklist-shield-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #dcfce7;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.checklist-copy strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 750;
+  color: #172f52;
+  line-height: 1.2;
+}
+
+.checklist-copy p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.checklist-latency-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #10b981;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+/* ==========================================================================
+   2. NOMBRE DE LA MISIÓN
+   ========================================================================== */
+.mission-name-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(15, 23, 42, 0.02);
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mission-name-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0284c7;
+  letter-spacing: 0.6px;
+}
+
+.mission-name-input-wrap {
+  display: flex;
+  align-items: center;
+  background: #f0f4ff;
+  border-radius: 12px;
+  padding: 0 14px;
+  height: 48px;
+  border: 1.5px solid transparent;
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.mission-name-input-wrap:focus-within {
+  border-color: #93c5fd;
+  background: #ffffff;
+}
+
+.mission-name-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 750;
+  color: #172f52;
+  outline: none;
+  width: 100%;
+}
+
+.btn-clear-input {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+}
+
+/* ==========================================================================
+   3. WAYPOINTS & TELEMETRÍA (Mapa y controles)
+   ========================================================================== */
+.telemetry-card-section {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 4px 12px rgba(15, 23, 42, 0.02);
+  border: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.telemetry-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #172f52;
+}
+
+.programar-map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 250px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+/* Tarjeta flotante superpuesta en el mapa (E2 -> A) */
+.map-overlay-card {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  z-index: 1000;
+  border: 1px solid #f1f5f9;
+}
+
+.overlay-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overlay-badge-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.overlay-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.overlay-text strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #172f52;
+  line-height: 1.1;
+}
+
+.overlay-text span {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.overlay-duration {
+  font-size: 12px;
+  font-weight: 800;
+  color: #059669;
+}
+
+.waypoint-warning-box {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+/* Altura Operativa */
+.operating-height-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.height-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.height-label {
+  font-size: 13px;
+  font-weight: 750;
+  color: #172f52;
+}
+
+.height-value-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.height-value-badge strong {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0284c7;
+}
+
+.height-value-badge small {
+  font-size: 11px;
+  color: #172f52;
+  font-weight: 700;
+}
+
+.height-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-limit-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  min-width: 30px;
+}
+
+.height-range-slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.height-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #0284c7;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.height-compliance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.compliance-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #172f52;
+}
+
+.badge-certificado {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+/* Geocercas de Exclusión Block */
+.exclusion-geofences-block {
+  background: #f0f4ff;
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exclusion-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.exclusion-info-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exclusion-shield-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #fee2e2;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.exclusion-texts strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 750;
+  color: #172f52;
+  line-height: 1.15;
+}
+
+.exclusion-texts p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.exclusion-toggle {
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  padding: 3px;
+  transition: background-color 200ms ease;
+  flex-shrink: 0;
+}
+
+.exclusion-toggle.is-active {
+  background: #0284c7;
+}
+
+.exclusion-toggle-thumb {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateX(0);
+  transition: transform 200ms ease;
+}
+
+.exclusion-toggle.is-active .exclusion-toggle-thumb {
+  transform: translateX(20px);
+}
+
+.exclusion-footnote {
+  font-size: 10.5px;
+  font-style: italic;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* ==========================================================================
+   4. PLANIFICAR VUELO (Grid 2x2)
+   ========================================================================== */
+.planificar-vuelo-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.planificar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planificar-title-row h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #172f52;
+}
+
+.planificar-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.plan-card {
+  background: #f0f4ff;
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 100ms ease;
+  border: 1.5px solid transparent;
+}
+
+.plan-card:hover {
+  background: #e6edfc;
+  border-color: #bfdbfe;
+}
+
+.plan-card:active {
+  transform: scale(0.98);
+}
+
+.plan-card--duration {
+  cursor: default;
+  background: #f0fdf9;
+  border: 1px solid #ccfbf1;
+}
+
+.plan-card-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0284c7;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.plan-card-tag--teal {
+  color: #0d9488;
+}
+
+.plan-card-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: #172f52;
+  line-height: 1.2;
+}
+
+.plan-card-val--large {
+  font-size: 19px;
+  margin-top: 2px;
+}
+
+.plan-card-sub {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Mensajes de feedback */
+.programar-feedback-alert {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.programar-feedback-success {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   5. BOTÓN «PROGRAMAR VUELO»
+   ========================================================================== */
+.btn-programar-vuelo-primary {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  border: none;
+  background: #0069a8;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 105, 168, 0.28);
+  margin-top: 4px;
+  transition: background-color 150ms ease, transform 100ms ease;
+}
+
+.btn-programar-vuelo-primary:hover {
+  background: #005a91;
+}
+
+.btn-programar-vuelo-primary:active {
+  transform: translateY(1px);
+}
+
+/* ==========================================================================
+   MODALES DE CONFIGURACIÓN INTERACTIVA
+   ========================================================================== */
+.programar-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.programar-modal-box {
+  width: min(100%, 390px);
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.programar-modal-box h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #172f52;
+}
+
+.modal-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.modal-field-block input,
+.modal-field-block select {
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 0 10px;
+  font-size: 13px;
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.frecuencia-type-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-freq-opt {
+  height: 38px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-freq-opt.is-active {
+  border-color: #0284c7;
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+.days-selector-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.days-selector-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.days-buttons-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.btn-day-pill {
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-day-pill.is-selected {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+.patrol-type-preview {
+  font-size: 12px;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.patrol-type-preview strong {
+  color: #0284c7;
+}
+
+.btn-modal-done {
+  height: 42px;
+  border-radius: 10px;
+  border: none;
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 750;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   ESTILOS DE ELEMENTOS DE MAPA PARA PROGRAMAR RUTA
+   ========================================================================== */
+.map-helipad-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.map-helipad-badge--sur {
+  background: #6366f1;
+}
+
+.map-waypoint-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+
+.map-waypoint-badge.is-start {
+  background: #0284c7;
+}
+
+.map-waypoint-badge.is-end {
+  background: #10b981;
+}
