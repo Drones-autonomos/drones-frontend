@@ -1,0 +1,855 @@
+/* ==========================================================================
+   BITÁCORA GUARDIA - AEROLUFERAN (Fiel a la captura Figma)
+   Tipografía obligatoria global: Inter
+   Diferencia con Admin: NO incluye botón ni opciones de descarga de video
+   ========================================================================== */
+
+.bitacora-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: #f0f4f9;
+  color: #172f52;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bitacora-shell {
+  width: min(100%, 460px);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f7f9fc;
+  box-shadow: 0 0 30px rgba(15, 23, 42, 0.06);
+}
+
+/* ==========================================================================
+   1. ENCABEZADO SUPERIOR AEROLUFERAN
+   ========================================================================== */
+.bitacora-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px 20px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #edf2f7;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.bitacora-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bitacora-brand-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #172f52;
+  letter-spacing: -0.3px;
+}
+
+/* ==========================================================================
+   2. CONTENIDO PRINCIPAL Y SCROLL
+   ========================================================================== */
+.bitacora-content {
+  flex: 1;
+  padding: 16px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ==========================================================================
+   3. TARJETA CONTROL DE ACCESO (RBAC)
+   ========================================================================== */
+.rbac-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #eef4ff;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  padding: 12px 14px;
+}
+
+.rbac-card__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rbac-card__icon-wrapper {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.12);
+  flex-shrink: 0;
+}
+
+.rbac-card__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rbac-card__eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  color: #0284c7;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.rbac-card__role {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rbac-switch-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #dde7fa;
+  border: none;
+  border-radius: 14px;
+  padding: 7px 12px;
+  color: #1e3a8a;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  text-align: right;
+  line-height: 1.15;
+}
+
+.rbac-switch-btn:hover {
+  background: #cfddf8;
+  transform: translateY(-1px);
+}
+
+.rbac-switch-btn:active {
+  transform: translateY(0);
+}
+
+.rbac-switch-btn span {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   4. BUSCADOR DE VUELOS
+   ========================================================================== */
+.bitacora-search-wrapper {
+  width: 100%;
+}
+
+.bitacora-search-bar {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  padding: 4px 14px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bitacora-search-bar:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.bitacora-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  outline: none;
+}
+
+.bitacora-search-input::placeholder {
+  color: #475569;
+  font-weight: 600;
+}
+
+.bitacora-search-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+}
+
+.bitacora-search-clear {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition: color 0.15s ease;
+}
+
+.bitacora-search-clear:hover {
+  color: #0f172a;
+}
+
+.bitacora-search-icon {
+  display: grid;
+  place-items: center;
+  color: #334155;
+}
+
+/* ==========================================================================
+   5. FILTROS DE VUELOS (TODOS / CON INCIDENTES)
+   ========================================================================== */
+.bitacora-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-pill {
+  border-radius: 9999px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.filter-pill--active {
+  background: #00649c;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 100, 156, 0.24);
+}
+
+.filter-pill--inactive {
+  background: #e8eef8;
+  color: #334155;
+}
+
+.filter-pill--inactive:hover {
+  background: #dce5f4;
+}
+
+/* ==========================================================================
+   6. TARJETAS DEL HISTORIAL DE VUELOS
+   ========================================================================== */
+.flight-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.flight-card-bitacora {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 16px 14px 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.flight-card-bitacora:hover {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
+}
+
+/* 6.1 Encabezado de la tarjeta: Título e indicador de incidentes */
+.flight-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.flight-card__title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.flight-card__main-title {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  color: #0f172a;
+}
+
+.flight-card__word {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.flight-card__number {
+  font-size: 21px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.flight-card__circuit {
+  font-size: 13.5px;
+  font-weight: 750;
+  color: #475569;
+}
+
+/* Indicador de incidentes en la esquina superior derecha */
+.incident-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.incident-badge--danger {
+  background: #ffe3e3;
+  color: #b91c1c;
+}
+
+.incident-badge--success {
+  background: #bbf7d0;
+  color: #14532d;
+}
+
+.incident-badge__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.incident-badge--danger .incident-badge__dot {
+  background: #dc2626;
+}
+
+.incident-badge--success .incident-badge__dot {
+  background: #16a34a;
+}
+
+.incident-badge__lines {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 6.2 Operador responsable o Autónomo IA */
+.flight-card__operator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-top: -4px;
+}
+
+/* 6.3 Fecha, horario y duración */
+.flight-card__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -2px;
+}
+
+.flight-card__time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: #475569;
+  font-weight: 550;
+}
+
+/* Indicador de retención de 30 días */
+.retention-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.retention-indicator--normal {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.retention-indicator--warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.retention-indicator--critical {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.retention-indicator--expired {
+  background: #f1f5f9;
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+/* ==========================================================================
+   7. REPRODUCTOR DE VIDEO NATIVO HTML5
+   ========================================================================== */
+.video-player-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0b1526;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-player__tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.video-player__media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-player__play-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.18);
+  border: none;
+  cursor: pointer;
+  color: #ffffff;
+  transition: background 0.18s ease, transform 0.18s ease;
+  z-index: 4;
+}
+
+.video-player__play-overlay:hover {
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.video-player__play-overlay:hover svg {
+  transform: scale(1.06);
+}
+
+.video-player__play-overlay svg {
+  transition: transform 0.18s ease;
+}
+
+.video-player__expired-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  gap: 6px;
+  color: #f8fafc;
+  z-index: 6;
+}
+
+.video-player__expired-overlay strong {
+  font-size: 14px;
+  color: #f87171;
+}
+
+.video-player__expired-overlay p {
+  margin: 0;
+  font-size: 11.5px;
+  color: #cbd5e1;
+  max-width: 260px;
+}
+
+/* ==========================================================================
+   8. TARJETA DE DATOS DE TELEMETRÍA
+   ========================================================================== */
+.telemetry-bar {
+  background: #f0f4fc;
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.telemetry-metric {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: #334155;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   9. INTEGRIDAD Y REGISTRO CRIPTOGRÁFICO
+   ========================================================================== */
+.integrity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px;
+}
+
+.integrity-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 750;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.integrity-left:hover {
+  text-decoration: underline;
+}
+
+.integrity-right {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* ==========================================================================
+   10. BOTÓN DE ACCIÓN: VER GRABACIÓN (EXCLUSIVO GUARDIA: SIN DESCARGA)
+   ========================================================================== */
+.flight-actions-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.btn-view-recording {
+  width: 100%;
+  height: 44px;
+  border-radius: 9999px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+/* Botón sólido azul (Vuelo #3) */
+.btn-view-recording--solid {
+  background: #00649c;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 100, 156, 0.28);
+}
+
+.btn-view-recording--solid:hover:not(:disabled) {
+  background: #00507c;
+  transform: translateY(-1px);
+}
+
+/* Botón suave azul lavanda (Vuelo #2) */
+.btn-view-recording--soft {
+  background: #e0eaff;
+  color: #00649c;
+}
+
+.btn-view-recording--soft:hover:not(:disabled) {
+  background: #d0e0ff;
+  transform: translateY(-1px);
+}
+
+.btn-view-recording:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ==========================================================================
+   11. ESTADOS VACÍOS
+   ========================================================================== */
+.empty-bitacora {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 32px 20px;
+  border: 1px dashed #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.empty-bitacora h3 {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.empty-bitacora p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  max-width: 280px;
+  line-height: 1.4;
+}
+
+.btn-reset-search {
+  margin-top: 8px;
+  background: #00649c;
+  color: #ffffff;
+  border: none;
+  border-radius: 9999px;
+  padding: 8px 18px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-reset-search:hover {
+  background: #00507c;
+}
+
+/* ==========================================================================
+   12. VENTANAS MODALES
+   ========================================================================== */
+.bitacora-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.bitacora-modal-card {
+  width: min(100%, 420px);
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px 18px 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bitacora-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bitacora-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.bitacora-modal-close {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bitacora-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.bitacora-modal-body {
+  font-size: 13.5px;
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.bitacora-modal-body p {
+  margin: 0;
+}
+
+.modal-session-detail {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.modal-session-detail span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.modal-session-detail strong {
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.bitacora-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btn-modal-cancel {
+  flex: 1;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-modal-cancel:hover {
+  background: #f1f5f9;
+}
+
+.btn-modal-confirm {
+  flex: 1;
+  height: 42px;
+  border-radius: 12px;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+  transition: background 0.15s ease;
+}
+
+.btn-modal-confirm:hover {
+  background: #b91c1c;
+}
+
+/* Modal de Video en Gran Formato (exclusivo Guardia: sin botón de descarga) */
+.modal-video-card {
+  width: min(100%, 520px);
+}
+
+.modal-video-player-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+
+.modal-video-player-wrapper video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 480px) {
+  .bitacora-shell {
+    width: 100%;
+  }
+
+  .bitacora-content {
+    padding: 12px 12px 28px;
+  }
+
+  .flight-card-bitacora {
+    padding: 14px 12px 12px;
+  }
+}

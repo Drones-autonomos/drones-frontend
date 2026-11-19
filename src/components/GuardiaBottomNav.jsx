@@ -18,7 +18,7 @@ const guardNavigationItems = [
 ]
 
 function GuardiaBottomNav({ pendingAlerts = null, activePath = null }) {
-  const { pendingAlertsCount } = useAlerts()
+  const { pendingAlertsCount } = useAlerts('guard')
   const displayAlerts = pendingAlerts !== null ? pendingAlerts : pendingAlertsCount
 
   return (

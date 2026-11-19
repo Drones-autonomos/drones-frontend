@@ -5,9 +5,9 @@ import Bitacora from './pages/Admin/Bitacora.jsx'
 import EnVivo from './pages/Admin/EnVivo.jsx'
 import ProgramarRuta from './pages/Admin/ProgramarRuta.jsx'
 import Rutas from './pages/Admin/Rutas.jsx'
-import GuardiaAjustes from './pages/Guardia/Ajustes/Ajustes.jsx'
-import GuardiaAlertas from './pages/Guardia/Alertas/Alertas.jsx'
-import GuardiaBitacora from './pages/Guardia/Bitacora/Bitacora.jsx'
+import GuardiaAjustes from './pages/Guardia/Ajustes.jsx'
+import GuardiaAlertas from './pages/Guardia/Alertas.jsx'
+import GuardiaBitacora from './pages/Guardia/Bitacora.jsx'
 import GuardiaEnVivo from './pages/Guardia/EnVivo/EnVivo.jsx'
 import GuardiaRutas from './pages/Guardia/Rutas/Rutas.jsx'
 import Login from './pages/Login/Login.jsx'
@@ -41,6 +41,7 @@ function App() {
         <Route path="/guardia/programar-ruta" element={<Navigate to="/guardia/rutas" replace />} />
         <Route path="/guardia/bitacora" element={<GuardiaBitacora />} />
         <Route path="/guardia/ajustes" element={<GuardiaAjustes />} />
+        <Route path="/guardia/ajustes/perfil" element={<GuardiaAjustes initialView="editProfile" />} />
 
         {/* Ruta por defecto */}
         <Route path="*" element={<Navigate to="/" replace />} />

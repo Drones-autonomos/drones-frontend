@@ -18,7 +18,7 @@ const navigationItems = [
 ]
 
 function AdminBottomNav({ pendingAlerts = null, activePath = null }) {
-  const { pendingAlertsCount } = useAlerts()
+  const { pendingAlertsCount } = useAlerts('admin')
   const displayAlerts = pendingAlerts !== null ? pendingAlerts : pendingAlertsCount
 
   return (

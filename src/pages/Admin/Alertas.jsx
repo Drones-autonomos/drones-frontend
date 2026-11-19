@@ -8,47 +8,8 @@ import {
   PlaneIcon,
   ShieldIcon,
 } from '../../components/EnVivoIcons.jsx'
-import campusReference from '../../assets/campus-reference.svg'
+import useAlerts from '../../hooks/useAlerts.js'
 import './Alertas.css'
-
-const demoAlerts = [
-  {
-    id: 'vanguard-01',
-    droneName: 'Vanguard-01',
-    type: 'humo',
-    severity: 'critical',
-    age: 'Hace 5 min',
-    location: 'Edificio B · Laboratorio',
-    description:
-      'Posible inicio de conato de incendio. El dron identificó una columna de humo denso con anomalía de calor sobre la ventilación secundaria. Zona sensible por almacenamiento contiguo de solventes orgánicos.',
-    detection: 'Detección Térmica: 88°C',
-    confidence: 'IA 96.4%',
-    coordinates: '19.3324° N, 99.1872° W',
-    altitude: 'Alt: 38m',
-    timestamp: '22:45 hrs',
-    image: campusReference,
-    audit: '#8F4C-A03E',
-    status: 'Pendiente',
-  },
-  {
-    id: 'vanguard-02',
-    droneName: 'Vanguard-02',
-    type: 'intruso',
-    severity: 'medium',
-    age: 'Hace 18 min',
-    location: 'Estacionamiento Docente Poniente',
-    description:
-      'Persona no autorizada fuera de horario. Se detectó a una persona sin credencial activa transitando entre vehículos luego del horario permitido (cierre 21:30 hrs).',
-    detection: 'Sujeto en movimiento',
-    confidence: 'IA 94.0%',
-    coordinates: 'Acceso Puerta 3',
-    altitude: 'N/A',
-    timestamp: '22:12 hrs',
-    image: campusReference,
-    audit: 'Registro Criptográfico Inmutable',
-    status: 'Revisado',
-  },
-]
 
 const filters = [
   { id: 'all', label: 'Todas' },
@@ -58,8 +19,8 @@ const filters = [
 
 function Alertas() {
   const navigate = useNavigate()
+  const { alerts, markAsViewed, dismissAlert, dispatchGuard } = useAlerts('admin')
   const [activeFilter, setActiveFilter] = useState('all')
-  const [alerts, setAlerts] = useState(demoAlerts)
   const [lastAction, setLastAction] = useState('')
 
   const filterCounts = useMemo(
@@ -78,17 +39,17 @@ function Alertas() {
   )
 
   const handleViewLive = (alert) => {
-    navigate('/admin/live', { state: { droneId: alert.droneName } })
+    markAsViewed(alert.id)
+    navigate('/admin/live', { state: { droneId: alert.droneName, alertId: alert.id } })
   }
 
   const handleDispatchGuard = (alert) => {
+    dispatchGuard(alert.id)
     setLastAction(`Solicitud de guardia registrada localmente para ${alert.droneName}.`)
   }
 
   const handleDismiss = (alertId) => {
-    setAlerts((currentAlerts) =>
-      currentAlerts.filter((alert) => alert.id !== alertId),
-    )
+    dismissAlert(alertId)
     setLastAction('Notificación descartada y retirada de la vista actual.')
   }
 
@@ -253,7 +214,7 @@ function Alertas() {
           </div>
         )}
 
-        <AdminBottomNav pendingAlerts={alerts.length} />
+        <AdminBottomNav activePath="/admin/alertas" />
       </div>
     </div>
   )
