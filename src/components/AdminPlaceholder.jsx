@@ -9,7 +9,7 @@ function AdminPlaceholder({ title }) {
         <h1>{title}</h1>
         <p>Esta pantalla se completará cuando se proporcione su diseño.</p>
       </main>
-      <AdminBottomNav pendingAlerts={3} />
+      <AdminBottomNav  />
     </div>
   )
 }

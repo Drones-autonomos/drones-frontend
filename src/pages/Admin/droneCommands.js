@@ -1,17 +1,17 @@
-function reportDisconnectedCommand(commandName) {
-  throw new Error(
-    `No se envió el comando "${commandName}": el control del dron todavía no está conectado.`,
-  )
-}
+import { droneControlService } from '../../services/droneControlService.js'
 
 export async function requestPauseFlight() {
-  reportDisconnectedCommand('pausar vuelo')
+  return await droneControlService.pauseFlight()
 }
 
-export async function requestReturnToBase() {
-  reportDisconnectedCommand('volver a base')
+export async function requestResumeFlight() {
+  return await droneControlService.resumeFlight()
+}
+
+export async function requestReturnToBase(heliportId) {
+  return await droneControlService.returnToBase(heliportId)
 }
 
 export async function requestEmergencyStop() {
-  reportDisconnectedCommand('parada inmediata')
+  return await droneControlService.emergencyStop()
 }

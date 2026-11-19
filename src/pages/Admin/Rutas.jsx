@@ -23,6 +23,8 @@ import { GeofenceManagerModal, NewZoneDialog } from './GeofenceManagerModal.jsx'
 import {
   initialDroneCommState,
   initialPreflightData,
+  getStoredAutonomous,
+  saveAutonomous,
   getStoredMissions,
   getStoredGeofences,
   saveGeofences,
@@ -37,7 +39,7 @@ export default function Rutas() {
   const [droneComm, setDroneComm] = useState(initialDroneCommState)
 
   // 2. Estado del interruptor de Vuelo Autónomo Activo
-  const [autonomousEnabled, setAutonomousEnabled] = useState(true)
+  const [autonomousEnabled, setAutonomousEnabled] = useState(getStoredAutonomous)
 
   // 3. Geocercas registradas (con persistencia local en modo demo)
   const [geofences, setGeofences] = useState(getStoredGeofences)
@@ -45,27 +47,30 @@ export default function Rutas() {
   // 4. Misiones / Rutas programadas
   const [missions, setMissions] = useState(getStoredMissions)
 
-  // Sincronizar misiones y geocercas en tiempo real
+  // Sincronizar misiones, geocercas y vuelo autónomo en tiempo real
   useEffect(() => {
     function syncData() {
-      setMissions(getStoredMissions())
-      setGeofences(getStoredGeofences())
+      const storedMissions = getStoredMissions()
+      setMissions((prev) => (JSON.stringify(prev) === JSON.stringify(storedMissions) ? prev : storedMissions))
+
+      const storedGeo = getStoredGeofences()
+      setGeofences((prev) => (JSON.stringify(prev) === JSON.stringify(storedGeo) ? prev : storedGeo))
+
+      const storedAuto = getStoredAutonomous()
+      setAutonomousEnabled((prev) => (prev === storedAuto ? prev : storedAuto))
     }
 
     window.addEventListener('storage', syncData)
     window.addEventListener('aeroluferan_missions_updated', syncData)
     window.addEventListener('aeroluferan_geofences_updated', syncData)
+    window.addEventListener('aeroluferan_autonomous_updated', syncData)
     return () => {
       window.removeEventListener('storage', syncData)
       window.removeEventListener('aeroluferan_missions_updated', syncData)
       window.removeEventListener('aeroluferan_geofences_updated', syncData)
+      window.removeEventListener('aeroluferan_autonomous_updated', syncData)
     }
   }, [])
-
-  // Guardar geocercas en localStorage en modo demo
-  useEffect(() => {
-    saveGeofences(geofences)
-  }, [geofences])
 
   // Alternar estado de conexión del dron para pruebas de desconexión / sin señal
   function handleToggleCommStatus() {
@@ -89,15 +94,6 @@ export default function Rutas() {
   const [pendingZoneBounds, setPendingZoneBounds] = useState(null)
   const [flightStatusMessage, setFlightStatusMessage] = useState(null)
 
-  // Guardar geocercas en localStorage en modo demo
-  useEffect(() => {
-    try {
-      localStorage.setItem('aeroluferan_geofences', JSON.stringify(geofences))
-    } catch {
-      // ignore
-    }
-  }, [geofences])
-
   const selectedMission = useMemo(
     () => missions.find((m) => m.id === selectedMissionId) || missions[0],
     [missions, selectedMissionId],
@@ -113,8 +109,7 @@ export default function Rutas() {
   function handleToggleAutonomous() {
     setAutonomousEnabled((prev) => {
       const next = !prev
-      // Puntos preparados para conectar con el servicio backend:
-      // api.setAutonomousFlightMode({ enabled: next })
+      saveAutonomous(next)
       return next
     })
   }
@@ -171,21 +166,29 @@ export default function Rutas() {
 
   // Manejadores de geocercas
   function handleToggleZoneStatus(zoneId) {
-    setGeofences((prev) =>
-      prev.map((z) =>
+    setGeofences((prev) => {
+      const updated = prev.map((z) =>
         z.id === zoneId ? { ...z, status: z.status === 'Activa' ? 'Inactiva' : 'Activa' } : z,
-      ),
-    )
+      )
+      saveGeofences(updated)
+      return updated
+    })
   }
 
   function handleDeleteZone(zoneId) {
-    setGeofences((prev) => prev.filter((z) => z.id !== zoneId))
+    setGeofences((prev) => {
+      const updated = prev.filter((z) => z.id !== zoneId)
+      saveGeofences(updated)
+      return updated
+    })
   }
 
   function handleEditZone(zoneId, updatedFields) {
-    setGeofences((prev) =>
-      prev.map((z) => (z.id === zoneId ? { ...z, ...updatedFields } : z)),
-    )
+    setGeofences((prev) => {
+      const updated = prev.map((z) => (z.id === zoneId ? { ...z, ...updatedFields } : z))
+      saveGeofences(updated)
+      return updated
+    })
   }
 
   function handleZoneCreatedOnMap(bounds) {
@@ -198,7 +201,11 @@ export default function Rutas() {
       id: `geo-${Date.now()}`,
       ...zoneData,
     }
-    setGeofences((prev) => [...prev, newZone])
+    setGeofences((prev) => {
+      const updated = [...prev, newZone]
+      saveGeofences(updated)
+      return updated
+    })
     setPendingZoneBounds(null)
   }
 
@@ -448,7 +455,7 @@ export default function Rutas() {
             </div>
 
             {/* ============================================================== */}
-            {/* 6. BOTÓN «PROGRAMAR NUEVA RUTA»                                */}
+            {/* 6. BOTÓN «PROGRAMAR NUEVA RUTA» (Solo para perfil Admin)       */}
             {/* ============================================================== */}
             <button
               type="button"
@@ -533,7 +540,7 @@ export default function Rutas() {
         {/* ============================================================== */}
         {/* 9. BARRA DE NAVEGACIÓN INFERIOR                                */}
         {/* ============================================================== */}
-        <AdminBottomNav pendingAlerts={3} />
+        <AdminBottomNav activePath="/admin/rutas" />
       </div>
     </div>
   )

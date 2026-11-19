@@ -1,7 +1,934 @@
-import AdminPlaceholder from '../../components/AdminPlaceholder.jsx'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import AdminBottomNav from '../../components/AdminBottomNav.jsx'
+import { AeroHelmetLogo, CloseModalIcon, DownloadTrayIcon } from '../../components/BitacoraIcons.jsx'
+import {
+  AuditDownloadIcon,
+  BackArrowIcon,
+  BellPushIcon,
+  ChevronRightIcon,
+  DataLifecycleIcon,
+  ExternalLinkIcon,
+  HeliportStationIcon,
+  NormativeDocIcon,
+  ShieldSmallCheckIcon,
+  SlidersAdjustIcon,
+  SparklesAiIcon,
+  TransmissionQualityIcon,
+  UserVerifiedBadgeIcon,
+  VideoLockIcon,
+} from '../../components/AjustesIcons.jsx'
+import { getCurrentUser, logoutUser, updateUserProfile } from './authSession.js'
+import {
+  AI_SENSITIVITY_OPTIONS,
+  DEFAULT_SETTINGS,
+  generateAuditExportFile,
+  getStoredSettings,
+  RETENTION_PERIOD_OPTIONS,
+  saveSettings,
+  TRANSMISSION_QUALITY_OPTIONS,
+} from './ajustesData.js'
+import './Ajustes.css'
 
-function Ajustes() {
-  return <AdminPlaceholder title="Ajustes" />
+/**
+ * Pantalla principal del Módulo Ajustes y Edición de Perfil de AeroLuferan
+ */
+export default function Ajustes({ initialView = 'main' }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  // Determinar si la vista inicial es "Editar perfil" según prop o ruta
+  const [view, setView] = useState(() => {
+    if (initialView === 'editProfile' || location.pathname.includes('/perfil')) {
+      return 'editProfile'
+    }
+    return 'main'
+  })
+
+  // Sincronizar con cambios de ruta si se navega directamente
+  useEffect(() => {
+    if (location.pathname.includes('/perfil')) {
+      setView('editProfile')
+    } else {
+      setView('main')
+    }
+  }, [location.pathname])
+
+  // 1. Estado de usuario autenticado
+  const [currentUser, setCurrentUser] = useState(getCurrentUser)
+
+  useEffect(() => {
+    function syncUser() {
+      setCurrentUser(getCurrentUser())
+    }
+    window.addEventListener('aeroluferan_session_changed', syncUser)
+    return () => window.removeEventListener('aeroluferan_session_changed', syncUser)
+  }, [])
+
+  // 2. Estado de ajustes del sistema
+  const [settings, setSettings] = useState(getStoredSettings)
+
+  useEffect(() => {
+    function syncSettings() {
+      setSettings(getStoredSettings())
+    }
+    window.addEventListener('aeroluferan_settings_updated', syncSettings)
+    return () => window.removeEventListener('aeroluferan_settings_updated', syncSettings)
+  }, [])
+
+  // 3. Modales interactivos
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false)
+  const [isRetentionModalOpen, setIsRetentionModalOpen] = useState(false)
+  const [isEncryptionModalOpen, setIsEncryptionModalOpen] = useState(false)
+  const [isQualityModalOpen, setIsQualityModalOpen] = useState(false)
+  const [isHeliportModalOpen, setIsHeliportModalOpen] = useState(false)
+  const [isNormativeModalOpen, setIsNormativeModalOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState(null)
+
+  // Referencia al input de archivo para cambiar foto
+  const fileInputRef = useRef(null)
+
+  function showToast(message) {
+    setToastMessage(message)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 3500)
+  }
+
+  // Opción activa de sensibilidad IA
+  const activeAiOption = useMemo(() => {
+    return (
+      AI_SENSITIVITY_OPTIONS.find((opt) => opt.id === settings.aiSensitivityId) ||
+      AI_SENSITIVITY_OPTIONS[1]
+    )
+  }, [settings.aiSensitivityId])
+
+  // Opción activa de calidad de transmisión
+  const activeQualityOption = useMemo(() => {
+    return (
+      TRANSMISSION_QUALITY_OPTIONS.find((opt) => opt.id === settings.transmissionQualityId) ||
+      TRANSMISSION_QUALITY_OPTIONS[0]
+    )
+  }, [settings.transmissionQualityId])
+
+  // Manejo del interruptor de Alertas Push Críticas
+  function handleTogglePush() {
+    const nextState = !settings.criticalPushEnabled
+    const updated = { ...settings, criticalPushEnabled: nextState }
+    setSettings(updated)
+    saveSettings(updated)
+    showToast(
+      nextState
+        ? 'Alertas push críticas activadas para detección de incidentes.'
+        : 'Alertas push críticas desactivadas en este dispositivo.',
+    )
+  }
+
+  // Manejo de selección de sensibilidad de detección IA
+  function handleSelectAiSensitivity(optionId) {
+    const updated = { ...settings, aiSensitivityId: optionId }
+    setSettings(updated)
+    saveSettings(updated)
+    const opt = AI_SENSITIVITY_OPTIONS.find((o) => o.id === optionId)
+    showToast(`Sensibilidad IA establecida en ${opt?.badgeText || optionId}.`)
+  }
+
+  // Manejo de cambio de ciclo de vida de grabaciones
+  function handleSelectRetention(days) {
+    const updated = { ...settings, retentionDays: days }
+    setSettings(updated)
+    saveSettings(updated)
+    setIsRetentionModalOpen(false)
+    showToast(`Periodo de retención configurado a ${days} días reglamentarios.`)
+  }
+
+  // Manejo de cambio de calidad de video
+  function handleSelectQuality(qualityId) {
+    const updated = { ...settings, transmissionQualityId: qualityId }
+    setSettings(updated)
+    saveSettings(updated)
+    setIsQualityModalOpen(false)
+    const opt = TRANSMISSION_QUALITY_OPTIONS.find((q) => q.id === qualityId)
+    showToast(`Calidad de transmisión actualizada a ${opt?.label.split(' (')[0] || qualityId}.`)
+  }
+
+  // Descarga del registro criptográfico de auditoría
+  function handleDownloadAudit() {
+    const { filename } = generateAuditExportFile()
+    showToast(`Descargando ${filename}`)
+  }
+
+  // Confirmación de cierre de sesión
+  function handleConfirmLogout() {
+    logoutUser()
+    setIsLogoutModalOpen(false)
+    navigate('/')
+  }
+
+  // Navegar a edición de perfil
+  function handleOpenEditProfile() {
+    setView('editProfile')
+    navigate('/admin/ajustes/perfil')
+  }
+
+  // Volver a vista principal de ajustes
+  function handleBackToAjustes() {
+    setView('main')
+    navigate('/admin/ajustes')
+  }
+
+  // Manejo de edición de Nombre
+  function handleNameChange(e) {
+    const newName = e.target.value
+    const updated = updateUserProfile({ name: newName })
+    setCurrentUser(updated)
+  }
+
+  // Manejo de edición de Puesto / Administrador
+  function handlePositionChange(e) {
+    const newPosition = e.target.value
+    const updated = updateUserProfile({ position: newPosition })
+    setCurrentUser(updated)
+  }
+
+  // Manejo de carga de fotografía de perfil
+  function handlePhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const photoUrl = reader.result
+      const updated = updateUserProfile({ photoUrl })
+      setCurrentUser(updated)
+      showToast('Fotografía de perfil actualizada.')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Iniciales del usuario para el avatar
+  const userInitials = useMemo(() => {
+    if (!currentUser?.name) return 'U'
+    const parts = currentUser.name.trim().split(' ')
+    return parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : parts[0].slice(0, 2).toUpperCase()
+  }, [currentUser])
+
+  return (
+    <div className="ajustes-page">
+      <div className="ajustes-shell">
+        {/* ============================================================== */}
+        {/* ENCABEZADO SUPERIOR AEROLUFERAN                                */}
+        {/* ============================================================== */}
+        <header className="ajustes-header">
+          <div className="ajustes-brand">
+            <AeroHelmetLogo size={38} />
+            <h1 className="ajustes-brand-title">AeroLuferan</h1>
+          </div>
+        </header>
+
+        {/* ============================================================== */}
+        {/* CONTENIDO PRINCIPAL: CONDICIONADO SEGÚN VISTA                  */}
+        {/* ============================================================== */}
+        {view === 'editProfile' ? (
+          /* ============================================================ */
+          /* VISTA: EDITAR PERFIL (Fiel a la captura de Figma)            */
+          /* ============================================================ */
+          <main className="ajustes-content" style={{ paddingBottom: '24px' }}>
+            <section className="edit-profile-card" aria-label="Editar datos personales">
+              {/* Encabezado con flecha de retorno y título centrado */}
+              <div className="edit-profile-header">
+                <button
+                  type="button"
+                  className="edit-profile-back-btn"
+                  onClick={handleBackToAjustes}
+                  aria-label="Volver a Ajustes"
+                >
+                  <BackArrowIcon size={18} />
+                </button>
+                <h2 className="edit-profile-title">Editar perfil</h2>
+              </div>
+
+              {/* Sección de fotografía de perfil */}
+              <div className="edit-profile-photo-section">
+                <div className="edit-profile-avatar-circle" aria-label="Fotografía de perfil">
+                  {currentUser.photoUrl ? (
+                    <img src={currentUser.photoUrl} alt={`Foto de ${currentUser.name}`} />
+                  ) : null}
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                />
+
+                <button
+                  type="button"
+                  className="edit-profile-change-photo-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Cambiar foto
+                </button>
+              </div>
+
+              {/* Formulario de campos */}
+              <div className="edit-profile-form">
+                {/* Campo 1: Nombre (Editable) */}
+                <div className="edit-profile-field">
+                  <label className="edit-profile-label" htmlFor="input-nombre-perfil">
+                    Nombre
+                  </label>
+                  <input
+                    id="input-nombre-perfil"
+                    type="text"
+                    className="edit-profile-input"
+                    value={currentUser.name || ''}
+                    onChange={handleNameChange}
+                    placeholder="Ingresa tu nombre"
+                  />
+                </div>
+
+                {/* Campo 2: Administrador / Puesto (Editable) */}
+                <div className="edit-profile-field">
+                  <label className="edit-profile-label" htmlFor="input-puesto-perfil">
+                    {currentUser.role === 'admin' ? 'Administrador' : 'Puesto'}
+                  </label>
+                  <input
+                    id="input-puesto-perfil"
+                    type="text"
+                    className="edit-profile-input"
+                    value={currentUser.position || ''}
+                    onChange={handlePositionChange}
+                    placeholder="Ingresa tu cargo o puesto"
+                  />
+                </div>
+
+                {/* Campo 3: Correo (NO Editable) */}
+                <div className="edit-profile-field">
+                  <span className="edit-profile-label">Correo</span>
+                  <div className="edit-profile-readonly">
+                    {currentUser.email || 'lubazadmin@admin.uaq.mx'}
+                  </div>
+                </div>
+
+                {/* Franja de estado de credencial y RBAC */}
+                <div className="edit-profile-badge-row">
+                  <span className="profile-credential-status">
+                    <span className="status-dot" aria-hidden="true" />
+                    <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
+                  </span>
+
+                  <span className="profile-rbac-badge">
+                    {currentUser.rbacBadge ||
+                      (currentUser.role === 'admin' ? 'RBAC: Académico' : 'RBAC: Seguridad')}
+                  </span>
+                </div>
+              </div>
+            </section>
+          </main>
+        ) : (
+          /* ============================================================ */
+          /* VISTA: AJUSTES PRINCIPAL                                      */
+          /* ============================================================ */
+          <main className="ajustes-content">
+            {/* A. TARJETA DE INFORMACIÓN DEL USUARIO */}
+            <section className="profile-card" aria-label="Información del usuario autenticado">
+              <div className="profile-card__top">
+                <div className="profile-card__avatar-wrap">
+                  {currentUser.photoUrl ? (
+                    <img
+                      src={currentUser.photoUrl}
+                      alt={currentUser.name}
+                      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div className="profile-avatar-circle" aria-label="Avatar del usuario">
+                      {userInitials}
+                    </div>
+                  )}
+                  <span className="profile-verified-badge" title="Credencial institucional verificada">
+                    <UserVerifiedBadgeIcon size={20} />
+                  </span>
+                </div>
+
+                <div className="profile-card__info">
+                  <h2 className="profile-card__name">{currentUser.name || 'Lu Bazaldúa'}</h2>
+                  <span className="profile-card__role">
+                    {currentUser.position || 'Coordinador de Software'}
+                  </span>
+                  <span className="profile-card__email">
+                    {currentUser.email || 'lubazadmin@admin.uaq.mx'}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  className="profile-chevron-btn"
+                  onClick={handleOpenEditProfile}
+                  aria-label="Abrir formulario para editar datos de perfil"
+                  title="Editar perfil"
+                >
+                  <ChevronRightIcon size={18} />
+                </button>
+              </div>
+
+              <div className="profile-card__bottom">
+                <span className="profile-credential-status">
+                  <span className="status-dot" aria-hidden="true" />
+                  <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
+                </span>
+
+                <span className="profile-rbac-badge">
+                  {currentUser.rbacBadge ||
+                    (currentUser.role === 'admin' ? 'RBAC: Académico' : 'RBAC: Seguridad')}
+                </span>
+              </div>
+            </section>
+
+            {/* B. SEGURIDAD & CONTROL OPERATIVO */}
+            <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
+            <section className="ajustes-group-card" aria-label="Seguridad y control operativo">
+              {/* Alertas Push Críticas */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                    <BellPushIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Alertas Push Críticas</strong>
+                    <p className="ajustes-item__subtitle">
+                      Detección inmediata de humo, calor e intrusiones nocturnas
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.criticalPushEnabled}
+                  aria-label="Activar o desactivar alertas push críticas"
+                  className={`ajustes-toggle-btn${settings.criticalPushEnabled ? ' is-active' : ''}`}
+                  onClick={handleTogglePush}
+                >
+                  <span className="ajustes-toggle-thumb" />
+                </button>
+              </div>
+
+              {/* Sensibilidad Detección IA */}
+              <div className="ajustes-item-row ajustes-item-row--stacked">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
+                  <div className="ajustes-item__left">
+                    <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                      <SparklesAiIcon size={22} />
+                    </div>
+                    <div className="ajustes-item__texts">
+                      <strong className="ajustes-item__title-line">Sensibilidad Detección IA</strong>
+                      <p className="ajustes-item__subtitle">Visión computacional en tiempo real</p>
+                    </div>
+                  </div>
+
+                  <span className="ai-sensitivity-badge">
+                    {activeAiOption.badgeText}
+                  </span>
+                </div>
+
+                {/* Selector de 3 segmentos */}
+                <div
+                  className="ai-segments-container"
+                  role="radiogroup"
+                  aria-label="Nivel de sensibilidad de detección IA"
+                >
+                  {AI_SENSITIVITY_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={settings.aiSensitivityId === opt.id}
+                      className={`ai-segment-btn${settings.aiSensitivityId === opt.id ? ' is-active' : ''}`}
+                      onClick={() => handleSelectAiSensitivity(opt.id)}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* C. ALMACENAMIENTO & PRIVACIDAD */}
+            <h2 className="ajustes-section-title">ALMACENAMIENTO & PRIVACIDAD</h2>
+            <section className="ajustes-group-card" aria-label="Almacenamiento y privacidad">
+              {/* Ciclo de vida de los datos */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--purple" aria-hidden="true">
+                    <DataLifecycleIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Ciclo de vida de los datos</strong>
+                    <p className="ajustes-item__subtitle">
+                      {settings.retentionDays} días reglamentarios
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-action-circle"
+                  onClick={() => setIsRetentionModalOpen(true)}
+                  title="Consultar y modificar ciclo de retención"
+                  aria-label="Consultar periodo de retención de datos"
+                >
+                  <ChevronRightIcon size={16} />
+                </button>
+              </div>
+
+              {/* Cifrado de Video */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--green" aria-hidden="true">
+                    <VideoLockIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <div className="ajustes-item__title-line">
+                      <strong>Cifrado de Video</strong>
+                      <ShieldSmallCheckIcon size={16} />
+                    </div>
+                    <p className="ajustes-item__subtitle">
+                      Cifrado de flujo activo en reposo y tránsito
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="encryption-status-pill"
+                  onClick={() => setIsEncryptionModalOpen(true)}
+                  title="Políticas de seguridad: Cifrado activo y bloqueado por normativa institucional"
+                >
+                  <span className="dot" aria-hidden="true" />
+                  <span>BLOQUEADO ON</span>
+                </button>
+              </div>
+
+              {/* Calidad de Transmisión de Vuelo */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                    <TransmissionQualityIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Calidad de Transmisión de Vuelo</strong>
+                    <p className="ajustes-item__subtitle">
+                      {activeQualityOption.label}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-action-circle"
+                  onClick={() => setIsQualityModalOpen(true)}
+                  title="Configurar calidad de transmisión de video"
+                  aria-label="Configurar calidad de transmisión de video"
+                >
+                  <SlidersAdjustIcon size={18} color="#00649c" />
+                </button>
+              </div>
+            </section>
+
+            {/* D. DISPOSITIVO & ESTACIÓN DE CARGA */}
+            <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
+            <section className="ajustes-group-card" aria-label="Dispositivos y estaciones de carga">
+              <div
+                className="ajustes-item-row"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setIsHeliportModalOpen(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setIsHeliportModalOpen(true)
+                }}
+              >
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--green" aria-hidden="true">
+                    <HeliportStationIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">
+                      {settings.helipads[0]?.name || 'Helipuerto Base Norte #01'}
+                    </strong>
+                    <p className="ajustes-item__subtitle">
+                      • {settings.helipads[0]?.connectionStatus || 'Conectada'} •{' '}
+                      {settings.helipads[0]?.chargingStatus || 'Carga Inductiva lista'}
+                    </p>
+                  </div>
+                </div>
+
+                <span className="heliport-percentage">
+                  {settings.helipads[0]?.batteryLevel || 100}%
+                </span>
+              </div>
+            </section>
+
+            {/* E. AUDITORÍA & NORMATIVA */}
+            <h2 className="ajustes-section-title">AUDITORÍA & NORMATIVA</h2>
+            <section className="ajustes-group-card" aria-label="Auditoría y normativa">
+              {/* Registro de Auditoría Local */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                    <AuditDownloadIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Registro de Auditoría Local</strong>
+                    <p className="ajustes-item__subtitle">
+                      Descargar historial criptográfico de telemetría
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-audit-download"
+                  onClick={handleDownloadAudit}
+                  title="Descargar archivo de auditoría criptográfica"
+                  aria-label="Descargar historial criptográfico de telemetría"
+                >
+                  <DownloadTrayIcon size={18} color="#00649c" />
+                </button>
+              </div>
+
+              {/* Privacidad Estudiantil & Espacio Aéreo */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--purple" aria-hidden="true">
+                    <NormativeDocIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">
+                      Privacidad Estudiantil & Espacio Aéreo
+                    </strong>
+                    <p className="ajustes-item__subtitle">Código Aeronáutico Civil &lt;200m AGL</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-normative-link"
+                  onClick={() => setIsNormativeModalOpen(true)}
+                  title="Consultar normativa aeronáutica y de privacidad"
+                  aria-label="Consultar código aeronáutico civil y privacidad"
+                >
+                  <ExternalLinkIcon size={18} />
+                </button>
+              </div>
+            </section>
+
+            {/* F. BOTÓN CERRAR SESIÓN Y VERSIÓN */}
+            <button
+              type="button"
+              className="btn-logout-ajustes"
+              onClick={() => setIsLogoutModalOpen(true)}
+            >
+              Cerrar Sesión
+            </button>
+
+            <p className="ajustes-version-footer">AeroLuferan OS v2.4.0</p>
+          </main>
+        )}
+
+        {/* ============================================================== */}
+        {/* BARRA DE NAVEGACIÓN INFERIOR                                   */}
+        {/* ============================================================== */}
+        <AdminBottomNav activePath="/admin/ajustes" />
+      </div>
+
+      {/* ============================================================== */}
+      {/* MODALES INTERACTIVOS Y CONFIGURACIÓN                           */}
+      {/* ============================================================== */}
+
+      {/* Modal 1: Cierre de sesión (Confirmación exacta solicitada) */}
+      {isLogoutModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="logout-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="logout-title">Cierre de sesión</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsLogoutModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <p>¿Deseas cerrar tu sesión actual en AeroLuferan?</p>
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsLogoutModalOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn-ajustes-modal-confirm"
+                onClick={handleConfirmLogout}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Ciclo de Vida y Retención de Datos */}
+      {isRetentionModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="retention-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="retention-title">Ciclo de Vida de los Datos</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsRetentionModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <p>
+                Las grabaciones del dron se almacenan temporalmente y están sujetas a la política de retención reglamentaria de la Bitácora.
+              </p>
+              <div className="modal-options-list">
+                {RETENTION_PERIOD_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.days}
+                    type="button"
+                    className={`modal-option-btn${settings.retentionDays === opt.days ? ' is-selected' : ''}`}
+                    onClick={() => handleSelectRetention(opt.days)}
+                  >
+                    <strong>{opt.days} Días Reglamentarios</strong>
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: '11.5px', color: '#64748b' }}>
+                Tras cumplir el periodo seleccionado, los archivos de video son purgados automáticamente del almacenamiento, conservando el registro criptográfico inmutable en la Bitácora.
+              </p>
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsRetentionModalOpen(false)}
+                style={{ width: '100%', flex: 'none' }}
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Políticas de Cifrado de Video */}
+      {isEncryptionModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="encryption-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="encryption-title">Cifrado de Video Obligatorio</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsEncryptionModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', fontWeight: '750' }}>
+                <ShieldSmallCheckIcon size={20} />
+                <span>Estado: BLOQUEADO ON (Activo Permanente)</span>
+              </div>
+              <p>
+                Conforme a la normativa de privacidad y protección de datos universitarios, el cifrado de flujo de video no puede desactivarse desde la interfaz de usuario.
+              </p>
+              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div><strong>Algoritmo:</strong> AES-256 GCM con autenticación de trama</div>
+                <div><strong>En tránsito:</strong> Enlace RF cifrado bidireccional (Dron ↔ Estación)</div>
+                <div><strong>En reposo:</strong> Cifrado de volumen por clave institucional UAQ</div>
+              </div>
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsEncryptionModalOpen(false)}
+                style={{ width: '100%', flex: 'none' }}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 4: Calidad de Transmisión de Vuelo */}
+      {isQualityModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="quality-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="quality-title">Calidad de Transmisión de Video</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsQualityModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <p>
+                Selecciona el perfil de compresión y tasa de bits para la transmisión de la cámara del dron:
+              </p>
+              <div className="modal-options-list">
+                {TRANSMISSION_QUALITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`modal-option-btn${settings.transmissionQualityId === opt.id ? ' is-selected' : ''}`}
+                    onClick={() => handleSelectQuality(opt.id)}
+                  >
+                    <strong>{opt.label}</strong>
+                    <span>Resolución {opt.resolution} · {opt.framerate} · {opt.bitrate}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsQualityModalOpen(false)}
+                style={{ width: '100%', flex: 'none' }}
+              >
+                Guardar Selección
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 5: Detalle del Helipuerto y Carga Inductiva */}
+      {isHeliportModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="heli-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="heli-title">Estado de la Estación de Carga</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsHeliportModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Estación principal:</span>
+                  <strong>{settings.helipads[0]?.name}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Conexión de telemetría:</span>
+                  <strong style={{ color: '#10b981' }}>✓ Conectada y calibrada</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Pad de carga por inducción:</span>
+                  <strong style={{ color: '#00649c' }}>Lista (100% Carga)</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Voltaje de salida:</span>
+                  <span>{settings.helipads[0]?.voltage || '48.2 V'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Domo protector:</span>
+                  <span>{settings.helipads[0]?.domeStatus || 'Abierto / Listo'}</span>
+                </div>
+              </div>
+              <p style={{ fontSize: '12px', color: '#64748b' }}>
+                Preparado para la alternancia automática entre Helipuerto Base Norte y Helipuerto Base Sur según la autonomía del dron.
+              </p>
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsHeliportModalOpen(false)}
+                style={{ width: '100%', flex: 'none' }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 6: Normativa Aeronáutica y Privacidad Estudiantil */}
+      {isNormativeModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="norm-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="norm-title">Normativa Aeronáutica y Privacidad</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsNormativeModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12.5px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div><strong>Regulación:</strong> Código Aeronáutico Civil para RPAS / Drones</div>
+                <div><strong>Límite de Techo Operativo:</strong> Estrictamente menor a 200m AGL</div>
+                <div><strong>Privacidad:</strong> Difuminado automático de rostros en grabaciones generales</div>
+                <div><strong>Geocercas de Exclusión:</strong> Restricción sobre interiores de aulas y áreas residenciales</div>
+              </div>
+              <p style={{ fontSize: '12px', color: '#64748b' }}>
+                La operación de AeroLuferan cumple con las disposiciones de la Agencia Federal de Aviación Civil (AFAC) y los lineamientos de privacidad de la Universidad Autónoma de Querétaro.
+              </p>
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsNormativeModalOpen(false)}
+                style={{ width: '100%', flex: 'none' }}
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast de retroalimentación de operaciones */}
+      {toastMessage && (
+        <div className="ajustes-toast" role="status">
+          <span>{toastMessage}</span>
+        </div>
+      )}
+    </div>
+  )
 }
-
-export default Ajustes

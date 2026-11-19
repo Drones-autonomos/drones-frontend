@@ -75,6 +75,14 @@ export function PauseIcon() {
   )
 }
 
+export function PlayIcon() {
+  return (
+    <svg viewBox="0 0 28 28" aria-hidden="true">
+      <path d="M8 5v18l14-9L8 5Z" />
+    </svg>
+  )
+}
+
 export function HomeIcon() {
   return (
     <svg viewBox="0 0 28 28" aria-hidden="true">
@@ -119,6 +127,14 @@ export function ExpandIcon() {
   )
 }
 
+export function CompressIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 14h6v6m10-10h-6V4M14 10l7-7M3 21l7-7" />
+    </svg>
+  )
+}
+
 export function LiveIcon() {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -136,10 +152,21 @@ export function BellIcon() {
   )
 }
 
-export function RouteIcon() {
+export function RouteIcon(props) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      <path d="m8 5-4 4 4 4m-4-4h5a5 5 0 0 1 5 5v4a5 5 0 0 0 5 5h9m-4-4 4 4-4 4M24 5l4 4-4 4m4-4h-5a5 5 0 0 0-5 5v4a5 5 0 0 1-5 5H4" />
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="6" cy="19" r="3" />
+      <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+      <circle cx="18" cy="5" r="3" />
     </svg>
   )
 }

@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="100%" height="100%">
+  <defs>
+    <!-- Evening/Dusk Sky Gradient -->
+    <linearGradient id="skyGradEvening" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#37474F" />
+      <stop offset="40%" stop-color="#546E7A" />
+      <stop offset="75%" stop-color="#90A4AE" />
+      <stop offset="100%" stop-color="#CFD8DC" />
+    </linearGradient>
+    <linearGradient id="buildingGradDusk" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#C5BAA5" />
+      <stop offset="50%" stop-color="#DDD4C4" />
+      <stop offset="100%" stop-color="#BDB19B" />
+    </linearGradient>
+    <linearGradient id="grassGradDusk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#556B2F" />
+      <stop offset="50%" stop-color="#3E5024" />
+      <stop offset="100%" stop-color="#283618" />
+    </linearGradient>
+    <linearGradient id="plazaGradDusk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B0BEC5" />
+      <stop offset="100%" stop-color="#78909C" />
+    </linearGradient>
+  </defs>
+
+  <!-- Evening Sky -->
+  <rect width="640" height="360" fill="url(#skyGradEvening)" />
+
+  <!-- Dusk Clouds with warm undertone -->
+  <ellipse cx="180" cy="80" rx="140" ry="30" fill="#B0BEC5" opacity="0.6" />
+  <ellipse cx="440" cy="65" rx="160" ry="35" fill="#ECEFF1" opacity="0.4" />
+  <ellipse cx="320" cy="95" rx="110" ry="22" fill="#CFD8DC" opacity="0.5" />
+
+  <!-- Rolling Grounds at Dusk -->
+  <path d="M 0 170 Q 240 150 420 180 T 640 190 L 640 360 L 0 360 Z" fill="url(#grassGradDusk)" />
+
+  <!-- Faculty Complex Panoramic View -->
+  <g transform="translate(140, 115)">
+    <!-- Curving Building Wing -->
+    <path d="M 0 65 Q 160 45 340 68 L 340 160 Q 160 145 0 155 Z" fill="url(#buildingGradDusk)" stroke="#9E9E9E" stroke-width="1.5" />
+    
+    <!-- Window Rows illuminated at evening -->
+    <g fill="#FFE082" opacity="0.8">
+      <!-- Top Floor Lit Windows -->
+      <rect x="25" y="75" width="12" height="15" rx="1" />
+      <rect x="50" y="73" width="12" height="15" rx="1" />
+      <rect x="75" y="72" width="12" height="15" rx="1" />
+      <rect x="100" y="71" width="12" height="15" rx="1" />
+      <rect x="125" y="70" width="12" height="15" rx="1" />
+      <rect x="150" y="70" width="12" height="15" rx="1" />
+      <rect x="175" y="70" width="12" height="15" rx="1" />
+      <rect x="200" y="71" width="12" height="15" rx="1" />
+      <rect x="225" y="72" width="12" height="15" rx="1" />
+      <rect x="250" y="73" width="12" height="15" rx="1" />
+      <rect x="275" y="75" width="12" height="15" rx="1" />
+      <rect x="300" y="77" width="12" height="15" rx="1" />
+
+      <!-- Lower Floor Lit Windows -->
+      <rect x="25" y="100" width="12" height="15" rx="1" />
+      <rect x="50" y="98" width="12" height="15" rx="1" />
+      <rect x="75" y="97" width="12" height="15" rx="1" />
+      <rect x="100" y="96" width="12" height="15" rx="1" />
+      <rect x="125" y="95" width="12" height="15" rx="1" />
+      <rect x="150" y="95" width="12" height="15" rx="1" />
+      <rect x="175" y="95" width="12" height="15" rx="1" />
+      <rect x="200" y="96" width="12" height="15" rx="1" />
+      <rect x="225" y="97" width="12" height="15" rx="1" />
+      <rect x="250" y="98" width="12" height="15" rx="1" />
+      <rect x="275" y="100" width="12" height="15" rx="1" />
+      <rect x="300" y="102" width="12" height="15" rx="1" />
+    </g>
+  </g>
+
+  <!-- Left Side Annex Building (Matches screenshot) -->
+  <g transform="translate(40, 140)">
+    <polygon points="0,50 60,35 60,140 0,145" fill="#B0BEC5" stroke="#78909C" stroke-width="1.5" />
+    <rect x="15" y="60" width="10" height="18" fill="#37474F" rx="1" />
+    <rect x="35" y="55" width="10" height="18" fill="#FFE082" opacity="0.85" rx="1" />
+    <rect x="15" y="90" width="10" height="18" fill="#37474F" rx="1" />
+    <rect x="35" y="85" width="10" height="18" fill="#37474F" rx="1" />
+  </g>
+
+  <!-- Circular Plaza at Dusk -->
+  <ellipse cx="320" cy="275" rx="220" ry="60" fill="url(#plazaGradDusk)" stroke="#607D8B" stroke-width="2" />
+  
+  <!-- Palm Trees (matches screenshot foreground on the right) -->
+  <g transform="translate(480, 160)">
+    <!-- Trunk -->
+    <path d="M 12 110 Q 15 50 18 0" stroke="#5D4037" stroke-width="5" fill="none" />
+    <!-- Fronds -->
+    <path d="M 18 0 Q 35 -15 50 -5" stroke="#2E7D32" stroke-width="3" fill="none" />
+    <path d="M 18 0 Q 30 -25 35 -35" stroke="#388E3C" stroke-width="3" fill="none" />
+    <path d="M 18 0 Q 5 -25 -10 -20" stroke="#2E7D32" stroke-width="3" fill="none" />
+    <path d="M 18 0 Q -10 -10 -20 5" stroke="#388E3C" stroke-width="3" fill="none" />
+    <path d="M 18 0 Q 40 10 45 25" stroke="#1B5E20" stroke-width="3" fill="none" />
+  </g>
+
+  <g transform="translate(530, 175)">
+    <!-- Palm 2 -->
+    <path d="M 10 100 Q 14 45 15 0" stroke="#4E342E" stroke-width="4.5" fill="none" />
+    <path d="M 15 0 Q 30 -12 42 -2" stroke="#2E7D32" stroke-width="2.5" fill="none" />
+    <path d="M 15 0 Q 25 -20 28 -28" stroke="#388E3C" stroke-width="2.5" fill="none" />
+    <path d="M 15 0 Q 5 -20 -8 -15" stroke="#2E7D32" stroke-width="2.5" fill="none" />
+  </g>
+
+  <!-- Low lights and benches in the plaza -->
+  <rect x="220" y="270" width="22" height="4" rx="2" fill="#37474F" />
+  <rect x="360" y="272" width="22" height="4" rx="2" fill="#37474F" />
+  <circle cx="290" cy="255" r="3" fill="#FFF59D" filter="drop-shadow(0 0 4px #FFEE58)" />
+  <circle cx="350" cy="255" r="3" fill="#FFF59D" filter="drop-shadow(0 0 4px #FFEE58)" />
+
+  <!-- Subtle Drone Night/Dusk Cam text -->
+  <text x="24" y="340" fill="#ECEFF1" font-family="'Inter', sans-serif" font-size="11" opacity="0.75" font-weight="600">AEROLUFERAN VANGUARD-01 · IR / LOW LIGHT SENSOR</text>
+</svg>

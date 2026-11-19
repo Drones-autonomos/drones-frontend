@@ -1,28 +1,30 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
+import DroneVideoPlayer from '../../components/DroneVideoPlayer.jsx'
+import EmergencyStopModal from '../../components/EmergencyStopModal.jsx'
 import {
   AltitudeIcon,
   BatteryIcon,
   CheckIcon,
   CompassIcon,
-  ExpandIcon,
   HeliportIcon,
   HomeIcon,
   PauseIcon,
   PlaneIcon,
+  PlayIcon,
   SatelliteIcon,
-  ShieldIcon,
   SignalIcon,
   StopIcon,
   WindIcon,
 } from '../../components/EnVivoIcons.jsx'
-import campusReference from '../../assets/campus-reference.svg'
+import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
+import useWebRTCStream from '../../hooks/useWebRTCStream.js'
 import {
   requestEmergencyStop,
   requestPauseFlight,
+  requestResumeFlight,
   requestReturnToBase,
 } from './droneCommands.js'
-import { enVivoDemoData } from './enVivoDemoData.js'
 import './EnVivo.css'
 
 const telemetryIcons = {
@@ -49,97 +51,8 @@ function FlightCard({ flight }) {
   )
 }
 
-function LiveIndicator({ status }) {
-  return (
-    <span className="preview-live-indicator">
-      <span className="preview-live-dot" />
-      {status}
-    </span>
-  )
-}
-
-function TelemetryOverlay({ preview }) {
-  return (
-    <>
-      <div className="preview-crosshair" aria-hidden="true">
-        <span />
-      </div>
-      <div className="preview-area-status">
-        <span className="preview-area-dot" />
-        <span>
-          <strong>✓ {preview.observedArea}</strong>
-          <span>{preview.areaStatus}</span>
-        </span>
-      </div>
-      <div className="preview-readings">
-        <span className="preview-reading">
-          <CompassIcon />
-          {preview.heading}
-        </span>
-        <span className="preview-reading">{preview.tilt}</span>
-      </div>
-    </>
-  )
-}
-
-function LivePreview({ preview }) {
-  const previewRef = useRef(null)
-  const [fullscreenMessage, setFullscreenMessage] = useState('')
-
-  async function toggleFullscreen() {
-    try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen()
-      } else if (previewRef.current?.requestFullscreen) {
-        await previewRef.current.requestFullscreen()
-      } else {
-        setFullscreenMessage('La pantalla completa no está disponible en este navegador.')
-      }
-    } catch (error) {
-      setFullscreenMessage(
-        error instanceof Error ? error.message : 'No se pudo abrir la pantalla completa.',
-      )
-    }
-  }
-
-  return (
-    <section className="live-preview-section" aria-label="Vista de referencia del dron">
-      <div className="live-preview" ref={previewRef}>
-        <img
-          className="live-preview__image"
-          src={campusReference}
-          alt="Ilustración estática de referencia de un edificio del campus y sus jardines"
-        />
-        <div className="preview-topline">
-          <LiveIndicator status={preview.status} />
-          <span className="preview-quality">{preview.resolution}</span>
-          <span className="preview-encryption">
-            <ShieldIcon />
-            {preview.encryption}
-          </span>
-        </div>
-        <span className="preview-demo-note">
-          VISTA DE REFERENCIA · SIN TRANSMISIÓN REAL
-        </span>
-        <TelemetryOverlay preview={preview} />
-        <button
-          className="preview-fullscreen"
-          type="button"
-          aria-label="Abrir vista previa en pantalla completa"
-          onClick={toggleFullscreen}
-        >
-          <ExpandIcon />
-        </button>
-      </div>
-      {fullscreenMessage && (
-        <p className="preview-message" role="status">{fullscreenMessage}</p>
-      )}
-    </section>
-  )
-}
-
 function TelemetryCard({ item }) {
-  const Icon = telemetryIcons[item.id]
+  const Icon = telemetryIcons[item.id] || CompassIcon
 
   return (
     <article className={`telemetry-card telemetry-card--${item.id}`} aria-label={item.label}>
@@ -159,6 +72,7 @@ function DroneActionButton({ action, Icon, children, variant = '' }) {
 
   async function handleAction() {
     try {
+      setMessage('')
       await action()
     } catch (error) {
       setMessage(
@@ -174,15 +88,21 @@ function DroneActionButton({ action, Icon, children, variant = '' }) {
         type="button"
         onClick={handleAction}
       >
-        <span className="drone-action__icon"><Icon /></span>
+        <span className="drone-action__icon">
+          <Icon />
+        </span>
         <span>{children}</span>
       </button>
-      {message && <p className="drone-action-message" role="status">{message}</p>}
+      {message && (
+        <p className="drone-action-message" role="status">
+          {message}
+        </p>
+      )}
     </>
   )
 }
 
-function QuickActions({ mode }) {
+function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onRequestEmergencyStop, actionMessage }) {
   return (
     <section className="quick-actions" aria-labelledby="quick-actions-title">
       <div className="quick-actions__heading">
@@ -190,19 +110,44 @@ function QuickActions({ mode }) {
         <span>{mode}</span>
       </div>
       <div className="quick-actions__buttons">
-        <DroneActionButton action={requestPauseFlight} Icon={PauseIcon}>
-          Pausar Vuelo
-        </DroneActionButton>
-        <DroneActionButton action={requestReturnToBase} Icon={HomeIcon}>
-          Volver a Base
-        </DroneActionButton>
-        <DroneActionButton
-          action={requestEmergencyStop}
-          Icon={StopIcon}
-          variant="emergency"
+        <button
+          className={`drone-action${isPaused ? ' drone-action--resume' : ''}`}
+          type="button"
+          onClick={onTogglePause}
         >
-          Detener Vuelo / Parada Inmediata
-        </DroneActionButton>
+          <span className="drone-action__icon">
+            {isPaused ? <PlayIcon /> : <PauseIcon />}
+          </span>
+          <span>{isPaused ? 'Reanudar Vuelo' : 'Pausar Vuelo'}</span>
+        </button>
+
+        <button
+          className="drone-action"
+          type="button"
+          onClick={onReturnToBase}
+        >
+          <span className="drone-action__icon">
+            <HomeIcon />
+          </span>
+          <span>Volver a Base</span>
+        </button>
+
+        <button
+          className="drone-action drone-action--emergency"
+          type="button"
+          onClick={onRequestEmergencyStop}
+        >
+          <span className="drone-action__icon">
+            <StopIcon />
+          </span>
+          <span>Detener Vuelo / Parada Inmediata</span>
+        </button>
+
+        {actionMessage && (
+          <p className="drone-action-message" role="status">
+            {actionMessage}
+          </p>
+        )}
       </div>
     </section>
   )
@@ -212,7 +157,9 @@ function HeliportCard({ heliport }) {
   return (
     <section className="heliport-card" aria-label="Estado del helipuerto">
       <div className="heliport-card__main">
-        <span className="heliport-card__icon"><HeliportIcon /></span>
+        <span className="heliport-card__icon">
+          <HeliportIcon />
+        </span>
         <div className="heliport-card__details">
           <strong>{heliport.name}</strong>
           <span>{heliport.landingSystem}</span>
@@ -220,7 +167,10 @@ function HeliportCard({ heliport }) {
         <span className="heliport-card__availability">{heliport.availability}</span>
       </div>
       <div className="heliport-card__status">
-        <span><CheckIcon />{heliport.protectionDome}</span>
+        <span>
+          <CheckIcon />
+          {heliport.protectionDome}
+        </span>
         <strong>{heliport.landingStatus}</strong>
       </div>
     </section>
@@ -228,11 +178,61 @@ function HeliportCard({ heliport }) {
 }
 
 function EnVivo() {
-  const { drone, flight, preview, telemetry, quickActions, heliport, pendingAlerts } =
-    enVivoDemoData
+  const { drone, flight, preview, cards, quickActions, heliport } = useDroneTelemetry()
+  const { stream, isLive, connectionState } = useWebRTCStream()
+
+  const [isPaused, setIsPaused] = useState(Boolean(flight.isPaused))
+  const [actionMessage, setActionMessage] = useState('')
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
+  const [isEmergencyStopping, setIsEmergencyStopping] = useState(false)
+
+  async function handleTogglePause() {
+    try {
+      setActionMessage('')
+      if (isPaused) {
+        await requestResumeFlight()
+        setIsPaused(false)
+      } else {
+        await requestPauseFlight()
+        setIsPaused(true)
+      }
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo pausar o reanudar el vuelo.',
+      )
+    }
+  }
+
+  async function handleReturnToBase() {
+    try {
+      setActionMessage('')
+      await requestReturnToBase(heliport?.stationNumber || '01')
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo ordenar el regreso a base.',
+      )
+    }
+  }
+
+  async function handleConfirmEmergencyStop() {
+    try {
+      setIsEmergencyStopping(true)
+      setActionMessage('')
+      await requestEmergencyStop()
+      setIsEmergencyModalOpen(false)
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo ejecutar la parada inmediata.',
+      )
+    } finally {
+      setIsEmergencyStopping(false)
+      setIsEmergencyModalOpen(false)
+    }
+  }
 
   return (
     <div className="admin-live-page">
+      {/* Encabezado Superior */}
       <header className="live-header">
         <div className="live-header__brand">
           <span className="live-header__drone-icon">
@@ -242,30 +242,62 @@ function EnVivo() {
           <div className="live-header__brand-copy">
             <h1>{drone.name}</h1>
             <span>
-              {drone.model} <i /> <b>{drone.patrolStatus}</b>
+              {drone.model} <i /> <b>{isPaused ? 'Vuelo Pausado' : (drone.patrolStatus || 'En Patrullaje')}</b>
             </span>
           </div>
         </div>
         <span className="live-header__signal">
           <SignalIcon />
-          {drone.signal}
-          <small>DEMO</small>
+          {drone.signalPercentage}% Señal
         </span>
       </header>
 
+      {/* Contenido Principal */}
       <main className="live-content">
         <FlightCard flight={flight} />
-        <LivePreview preview={preview} />
 
-        <section className="telemetry-grid" aria-label="Telemetría del dron (datos de demostración)">
-          {telemetry.map((item) => <TelemetryCard key={item.id} item={item} />)}
+        {/* Reproductor WebRTC Reutilizable */}
+        <DroneVideoPlayer
+          stream={stream}
+          isLive={isLive}
+          connectionState={connectionState}
+          preview={preview}
+        />
+
+        {/* Cuatro tarjetas de telemetría */}
+        <section
+          className="telemetry-grid"
+          aria-label="Telemetría en tiempo real del dron"
+        >
+          {cards.map((item) => (
+            <TelemetryCard key={item.id} item={item} />
+          ))}
         </section>
 
-        <QuickActions mode={quickActions.mode} />
+        {/* Acciones Rápidas */}
+        <QuickActions
+          mode={quickActions?.mode || flight.mode}
+          isPaused={isPaused}
+          onTogglePause={handleTogglePause}
+          onReturnToBase={handleReturnToBase}
+          onRequestEmergencyStop={() => setIsEmergencyModalOpen(true)}
+          actionMessage={actionMessage}
+        />
+
+        {/* Tarjeta de Helipuerto */}
         <HeliportCard heliport={heliport} />
       </main>
 
-      <AdminBottomNav pendingAlerts={pendingAlerts} />
+      {/* Navegación Inferior de Admin */}
+      <AdminBottomNav />
+
+      {/* Modal de confirmación para parada inmediata */}
+      <EmergencyStopModal
+        isOpen={isEmergencyModalOpen}
+        isLoading={isEmergencyStopping}
+        onClose={() => setIsEmergencyModalOpen(false)}
+        onConfirm={handleConfirmEmergencyStop}
+      />
     </div>
   )
 }

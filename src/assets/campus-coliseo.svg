@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGradDay" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1E88E5" />
+      <stop offset="60%" stop-color="#64B5F6" />
+      <stop offset="100%" stop-color="#E3F2FD" />
+    </linearGradient>
+    <linearGradient id="buildingGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E0D7C6" />
+      <stop offset="50%" stop-color="#F5EFE6" />
+      <stop offset="100%" stop-color="#D7CEBD" />
+    </linearGradient>
+    <linearGradient id="grassGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7CB342" />
+      <stop offset="50%" stop-color="#558B2F" />
+      <stop offset="100%" stop-color="#33691E" />
+    </linearGradient>
+    <linearGradient id="plazaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D7CCC8" />
+      <stop offset="100%" stop-color="#BCAAA4" />
+    </linearGradient>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="640" height="360" fill="url(#skyGradDay)" />
+
+  <!-- Distant Clouds -->
+  <ellipse cx="200" cy="70" rx="90" ry="25" fill="#ffffff" opacity="0.6" />
+  <ellipse cx="250" cy="65" rx="70" ry="20" fill="#ffffff" opacity="0.7" />
+  <ellipse cx="480" cy="80" rx="100" ry="28" fill="#ffffff" opacity="0.6" />
+
+  <!-- Rolling Green Hills / Lawn -->
+  <path d="M 0 160 Q 220 140 400 170 T 640 180 L 640 360 L 0 360 Z" fill="url(#grassGrad)" />
+
+  <!-- Main Faculty Building (Facultad de Informática) -->
+  <g transform="translate(110, 100)">
+    <!-- Building Body -->
+    <polygon points="0,70 200,60 380,80 380,180 0,175" fill="url(#buildingGrad)" stroke="#B0A898" stroke-width="2" />
+    
+    <!-- Entrance Porch / Columned section -->
+    <rect x="140" y="70" width="100" height="105" fill="#EFEBE9" stroke="#8D6E63" stroke-width="1.5" />
+    
+    <!-- Building Windows Grid -->
+    <g fill="#1A365D" opacity="0.85">
+      <!-- Floor 3 -->
+      <rect x="20" y="80" width="16" height="18" rx="2" />
+      <rect x="45" y="80" width="16" height="18" rx="2" />
+      <rect x="70" y="80" width="16" height="18" rx="2" />
+      <rect x="95" y="80" width="16" height="18" rx="2" />
+
+      <rect x="260" y="85" width="16" height="18" rx="2" />
+      <rect x="285" y="85" width="16" height="18" rx="2" />
+      <rect x="310" y="85" width="16" height="18" rx="2" />
+      <rect x="335" y="85" width="16" height="18" rx="2" />
+
+      <!-- Floor 2 -->
+      <rect x="20" y="110" width="16" height="18" rx="2" />
+      <rect x="45" y="110" width="16" height="18" rx="2" />
+      <rect x="70" y="110" width="16" height="18" rx="2" />
+      <rect x="95" y="110" width="16" height="18" rx="2" />
+
+      <rect x="260" y="115" width="16" height="18" rx="2" />
+      <rect x="285" y="115" width="16" height="18" rx="2" />
+      <rect x="310" y="115" width="16" height="18" rx="2" />
+      <rect x="335" y="115" width="16" height="18" rx="2" />
+
+      <!-- Floor 1 Entrance -->
+      <rect x="155" y="130" width="28" height="45" rx="3" fill="#0D2538" />
+      <rect x="195" y="130" width="28" height="45" rx="3" fill="#0D2538" />
+    </g>
+
+    <!-- Faculty Header text simulation -->
+    <rect x="145" y="90" width="90" height="12" fill="#00649C" opacity="0.8" rx="2" />
+  </g>
+
+  <!-- Paved Stone Plaza in Foreground -->
+  <polygon points="60,360 220,240 450,245 590,360" fill="url(#plazaGrad)" stroke="#A1887F" stroke-width="2" />
+  <!-- Plaza walkway lines -->
+  <line x1="220" y1="240" x2="60" y2="360" stroke="#8D6E63" stroke-width="2" opacity="0.6" />
+  <line x1="335" y1="242" x2="320" y2="360" stroke="#8D6E63" stroke-width="2" opacity="0.6" />
+  <line x1="450" y1="245" x2="590" y2="360" stroke="#8D6E63" stroke-width="2" opacity="0.6" />
+
+  <!-- Cypress / Evergreen Conical Trees (matches screenshot foreground) -->
+  <!-- Tree 1 -->
+  <g transform="translate(160, 160)">
+    <polygon points="18,0 0,130 36,130" fill="#1B5E20" />
+    <polygon points="18,20 4,110 32,110" fill="#2E7D32" opacity="0.8" />
+    <polygon points="18,40 8,90 28,90" fill="#388E3C" opacity="0.9" />
+    <rect x="15" y="130" width="6" height="20" fill="#4E342E" />
+  </g>
+
+  <!-- Tree 2 (Taller) -->
+  <g transform="translate(270, 130)">
+    <polygon points="22,0 0,160 44,160" fill="#1B5E20" />
+    <polygon points="22,30 5,140 39,140" fill="#2E7D32" opacity="0.8" />
+    <polygon points="22,60 10,120 34,120" fill="#388E3C" opacity="0.9" />
+    <rect x="19" y="160" width="7" height="24" fill="#4E342E" />
+  </g>
+
+  <!-- Tree 3 (Right edge) -->
+  <g transform="translate(520, 150)">
+    <polygon points="20,0 0,150 40,150" fill="#1B5E20" />
+    <polygon points="20,25 5,130 35,130" fill="#2E7D32" opacity="0.8" />
+    <rect x="17" y="150" width="6" height="25" fill="#4E342E" />
+  </g>
+
+  <!-- HUD overlay subtle watermarks -->
+  <text x="24" y="340" fill="#ffffff" font-family="'Inter', sans-serif" font-size="11" opacity="0.75" font-weight="600">AEROLUFERAN VANGUARD-01 · 4K RGB CAM</text>
+</svg>

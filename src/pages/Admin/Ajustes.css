@@ -1,0 +1,829 @@
+/* ==========================================================================
+   MÓDULO AJUSTES - AEROLUFERAN (Fiel a la captura Figma)
+   Tipografía obligatoria global: Inter
+   ========================================================================== */
+
+.ajustes-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  background: #f0f4f9;
+  color: #172f52;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.ajustes-shell {
+  width: min(100%, 460px);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f7f9fc;
+  box-shadow: 0 0 30px rgba(15, 23, 42, 0.06);
+}
+
+/* ==========================================================================
+   1. ENCABEZADO SUPERIOR AEROLUFERAN
+   ========================================================================== */
+.ajustes-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 16px 20px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #edf2f7;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.ajustes-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ajustes-brand-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #172f52;
+  letter-spacing: -0.3px;
+}
+
+/* ==========================================================================
+   2. CONTENIDO PRINCIPAL
+   ========================================================================== */
+.ajustes-content {
+  flex: 1;
+  padding: 16px 16px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ==========================================================================
+   3. TARJETA DE INFORMACIÓN DEL USUARIO (SUPERIOR)
+   ========================================================================== */
+.profile-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 18px 16px 14px;
+  border: 1px solid #edf2f7;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profile-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.profile-card__avatar-wrap {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 1.5px solid #00649c;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.profile-avatar-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0f7ff 0%, #dbeafe 100%);
+  display: grid;
+  place-items: center;
+  color: #00649c;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.profile-verified-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+}
+
+.profile-card__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-card__name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-card__role {
+  font-size: 13px;
+  font-weight: 650;
+  color: #0284c7;
+  line-height: 1.2;
+}
+
+.profile-card__email {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-chevron-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eef4fc;
+  border: none;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+
+.profile-chevron-btn:hover {
+  background: #dfeaf8;
+  color: #0f172a;
+}
+
+.profile-card__bottom {
+  background: #f1f6fd;
+  border-radius: 12px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.profile-credential-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.profile-credential-status .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.profile-rbac-badge {
+  font-size: 11.5px;
+  font-weight: 750;
+  color: #0284c7;
+}
+
+/* ==========================================================================
+   4. TÍTULOS DE SECCIÓN
+   ========================================================================== */
+.ajustes-section-title {
+  margin: 12px 4px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   5. TARJETAS DE GRUPO DE CONFIGURACIÓN
+   ========================================================================== */
+.ajustes-group-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #edf2f7;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ajustes-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  gap: 12px;
+}
+
+.ajustes-item-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.ajustes-item-row + .ajustes-item-row {
+  border-top: 1px solid #f1f5f9;
+}
+
+.ajustes-item__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.ajustes-item__icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ajustes-item__icon-wrap--blue {
+  background: #ebf5ff;
+}
+
+.ajustes-item__icon-wrap--green {
+  background: #e8f8f0;
+}
+
+.ajustes-item__icon-wrap--purple {
+  background: #f0edfe;
+}
+
+.ajustes-item__texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ajustes-item__title-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 750;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.ajustes-item__subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* ==========================================================================
+   6. CONTROLES ESPECÍFICOS (TOGGLE, SEGMENTOS, PILLS, BOTONES)
+   ========================================================================== */
+
+/* Toggle Switch estilo iOS */
+.ajustes-toggle-btn {
+  width: 48px;
+  height: 28px;
+  border-radius: 9999px;
+  border: none;
+  background: #cbd5e1;
+  padding: 2px;
+  cursor: pointer;
+  transition: background 0.22s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ajustes-toggle-btn.is-active {
+  background: #00649c;
+}
+
+.ajustes-toggle-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: block;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(0);
+}
+
+.ajustes-toggle-btn.is-active .ajustes-toggle-thumb {
+  transform: translateX(20px);
+}
+
+/* Badge de sensibilidad IA */
+.ai-sensitivity-badge {
+  background: #d8ebff;
+  color: #00649c;
+  font-size: 11px;
+  font-weight: 750;
+  border-radius: 12px;
+  padding: 4px 10px;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Selector de 3 segmentos de sensibilidad IA */
+.ai-segments-container {
+  background: #eef4fc;
+  border-radius: 12px;
+  padding: 4px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+
+.ai-segment-btn {
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.ai-segment-btn:hover:not(.is-active) {
+  color: #0f172a;
+}
+
+.ai-segment-btn.is-active {
+  background: #ffffff;
+  color: #00649c;
+  font-weight: 750;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+/* Botón sutil de cambio para ciclo de vida */
+.btn-action-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #eef4fc;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #00649c;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.btn-action-circle:hover {
+  background: #dbeafe;
+  transform: translateY(-1px);
+}
+
+/* Pill de cifrado bloqueado */
+.encryption-status-pill {
+  background: #e6f7f0;
+  color: #047857;
+  font-size: 10.5px;
+  font-weight: 800;
+  border-radius: 9999px;
+  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.3px;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.encryption-status-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #047857;
+}
+
+/* Porcentaje del Helipuerto */
+.heliport-percentage {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0284c7;
+  flex-shrink: 0;
+}
+
+/* Botón circular de descarga de auditoría */
+.btn-audit-download {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eef4fc;
+  border: none;
+  color: #00649c;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.btn-audit-download:hover {
+  background: #dfeaf8;
+  transform: translateY(-1px);
+}
+
+/* Botón de enlace externo para normativa */
+.btn-normative-link {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: #475569;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.btn-normative-link:hover {
+  color: #0f172a;
+}
+
+/* ==========================================================================
+   7. BOTÓN CERRAR SESIÓN Y PIE DE PÁGINA
+   ========================================================================== */
+.btn-logout-ajustes {
+  background: #feebeb;
+  color: #dc2626;
+  border: none;
+  border-radius: 9999px;
+  height: 48px;
+  width: 100%;
+  font-size: 15px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  margin-top: 6px;
+}
+
+.btn-logout-ajustes:hover {
+  background: #fdd8d8;
+  transform: translateY(-1px);
+}
+
+.btn-logout-ajustes:active {
+  transform: translateY(0);
+}
+
+.ajustes-version-footer {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 6px 0 10px;
+}
+
+/* ==========================================================================
+   8. VENTANAS MODALES INTERACTIVAS
+   ========================================================================== */
+.ajustes-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.ajustes-modal-card {
+  width: min(100%, 460px);
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: slideUp 0.22s ease-out;
+}
+
+.ajustes-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ajustes-modal-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ajustes-modal-close {
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.ajustes-modal-body {
+  font-size: 13.5px;
+  color: #475569;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ajustes-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.btn-ajustes-modal-cancel {
+  flex: 1;
+  height: 42px;
+  border-radius: 9999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.btn-ajustes-modal-confirm {
+  flex: 1;
+  height: 42px;
+  border-radius: 9999px;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Lista de opciones en modales */
+.modal-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.modal-option-btn:hover {
+  background: #f0f7ff;
+  border-color: #93c5fd;
+}
+
+.modal-option-btn.is-selected {
+  background: #eff6ff;
+  border-color: #00649c;
+}
+
+.modal-option-btn strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.modal-option-btn span {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* Toast de retroalimentación */
+.ajustes-toast {
+  position: fixed;
+  bottom: 125px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ==========================================================================
+   9. VISTA: EDITAR PERFIL (Fiel a la captura Figma)
+   ========================================================================== */
+.edit-profile-card {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 20px 28px;
+  border: 1px solid #edf2f7;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.edit-profile-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.edit-profile-back-btn {
+  position: absolute;
+  left: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eef4fc;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #1e293b;
+  transition: all 0.18s ease;
+}
+
+.edit-profile-back-btn:hover {
+  background: #dfeaf8;
+  transform: translateX(-1px);
+}
+
+.edit-profile-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.3px;
+  text-align: center;
+}
+
+.edit-profile-photo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 8px;
+}
+
+.edit-profile-avatar-circle {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  border: 1.5px solid #1e293b;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.edit-profile-avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.edit-profile-change-photo-btn {
+  background: transparent;
+  border: none;
+  color: #00649c;
+  font-size: 14.5px;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 2px 8px;
+  transition: color 0.18s ease;
+}
+
+.edit-profile-change-photo-btn:hover {
+  color: #004d77;
+  text-decoration: underline;
+}
+
+.edit-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.edit-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edit-profile-label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.edit-profile-input {
+  font-size: 15.5px;
+  font-weight: 600;
+  color: #00649c;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin-left: -6px;
+  outline: none;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.edit-profile-input:hover {
+  background: rgba(0, 100, 156, 0.04);
+}
+
+.edit-profile-input:focus {
+  background: #ffffff;
+  border-color: #00649c;
+  box-shadow: 0 0 0 3px rgba(0, 100, 156, 0.12);
+}
+
+.edit-profile-readonly {
+  font-size: 15.5px;
+  font-weight: 550;
+  color: #0f172a;
+  padding: 4px 0;
+  line-height: 1.3;
+}
+
+.edit-profile-badge-row {
+  background: #f1f6fd;
+  border-radius: 12px;
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}

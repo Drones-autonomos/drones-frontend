@@ -1,0 +1,89 @@
+.guardia-placeholder-page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  color: #1d273b;
+  background: #faf8ff;
+}
+
+.guardia-placeholder-content {
+  width: min(100%, 768px);
+  flex: 1;
+  margin: 0 auto;
+  padding: 48px 40px;
+}
+
+.guardia-placeholder-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: #00649c;
+  background: #cce7ff;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+}
+
+.guardia-placeholder-title {
+  margin: 24px 0 12px;
+  color: #151d2f;
+  font-size: 34px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.guardia-placeholder-desc {
+  max-width: 580px;
+  margin: 0 0 32px;
+  color: #596574;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.guardia-placeholder-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 2px solid #e9eaff;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(34, 45, 77, 0.05);
+}
+
+.guardia-placeholder-card__dot {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 50%;
+  background: #007b59;
+}
+
+.guardia-placeholder-card strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #1d273b;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.guardia-placeholder-card span {
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+@media (max-width: 520px) {
+  .guardia-placeholder-content {
+    padding: 32px 20px;
+  }
+
+  .guardia-placeholder-title {
+    font-size: 26px;
+  }
+
+  .guardia-placeholder-desc {
+    font-size: 16px;
+  }
+}

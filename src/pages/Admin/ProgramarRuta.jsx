@@ -664,7 +664,7 @@ export default function ProgramarRuta() {
         {/* ============================================================== */}
         {/* BARRA DE NAVEGACIÓN INFERIOR (Con Bitácora seleccionada)      */}
         {/* ============================================================== */}
-        <AdminBottomNav pendingAlerts={3} activePath="/admin/bitacora" />
+        <AdminBottomNav activePath="/admin/bitacora" />
       </div>
     </div>
   )

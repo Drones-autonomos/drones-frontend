@@ -6,6 +6,7 @@ import {
   RouteIcon,
   SettingsIcon,
 } from './EnVivoIcons.jsx'
+import useAlerts from '../hooks/useAlerts.js'
 import './AdminBottomNav.css'
 
 const navigationItems = [
@@ -16,7 +17,10 @@ const navigationItems = [
   { to: '/admin/ajustes', label: 'Ajustes', Icon: SettingsIcon },
 ]
 
-function AdminBottomNav({ pendingAlerts = 0, activePath = null }) {
+function AdminBottomNav({ pendingAlerts = null, activePath = null }) {
+  const { pendingAlertsCount } = useAlerts()
+  const displayAlerts = pendingAlerts !== null ? pendingAlerts : pendingAlertsCount
+
   return (
     <nav className="admin-bottom-nav" aria-label="Navegación de administrador">
       {navigationItems.map(({ to, label, Icon, showBadge }) => {
@@ -31,9 +35,9 @@ function AdminBottomNav({ pendingAlerts = 0, activePath = null }) {
           >
             <span className="admin-nav-icon">
               <Icon />
-              {showBadge && pendingAlerts > 0 && (
-                <span className="admin-nav-badge" aria-label={`${pendingAlerts} alertas pendientes`}>
-                  {pendingAlerts}
+              {showBadge && displayAlerts > 0 && (
+                <span className="admin-nav-badge" aria-label={`${displayAlerts} alertas pendientes`}>
+                  {displayAlerts}
                 </span>
               )}
             </span>

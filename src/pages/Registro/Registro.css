@@ -1,0 +1,351 @@
+/* ==========================================================================
+   MÓDULO REGISTRO - AEROLUFERAN (Fiel a la captura Figma)
+   Tipografía obligatoria: Inter
+   ========================================================================== */
+
+.registro-page {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 40px 20px 32px;
+  color: #203d66;
+  background: #f7f9fc;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.registro-content {
+  width: min(100%, 460px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   1. ENCABEZADO Y LOGOTIPO
+   ========================================================================== */
+.registro-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.registro-brand-mark {
+  display: block;
+  width: min(44vw, 190px);
+  height: auto;
+  margin: 0 auto 12px;
+  object-fit: contain;
+}
+
+.registro-brand-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.registro-brand-name h1 {
+  margin: 0;
+  color: #203d66;
+  font-size: clamp(32px, 7vw, 42px);
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  line-height: 1.1;
+}
+
+.registro-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1.5px solid #d8e9f8;
+  border-radius: 999px;
+  color: #8da4be;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   2. SECCIÓN CREAR CUENTA (SEGURIDAD / ACADÉMICO)
+   ========================================================================== */
+.account-creation-section {
+  margin-bottom: 20px;
+}
+
+.account-creation-section h2 {
+  margin: 0 0 12px 4px;
+  color: #8397af;
+  font-size: 13.5px;
+  font-weight: 750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.account-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.account-option-card {
+  min-height: 84px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  color: #78889f;
+  background: #ffffff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.account-option-card:hover {
+  border-color: #cbd5e1;
+}
+
+.account-option-card.is-selected {
+  border: 2.5px solid #1c3d69;
+  color: #203d66;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(28, 61, 105, 0.08);
+}
+
+.account-icon-box {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: #7d8ca0;
+  background: #f1f5f9;
+}
+
+.is-selected .account-icon-box {
+  color: #1c3d69;
+  background: #eef7fd;
+}
+
+.account-icon-box svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.3;
+}
+
+.account-text-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.account-text-box strong {
+  color: #203d66;
+  font-size: 15.5px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.account-text-box span {
+  color: #8da0b8;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* ==========================================================================
+   3. TARJETA BLANCA DE FORMULARIO
+   ========================================================================== */
+.registro-card {
+  padding: 24px 20px 22px;
+  border: 1.5px solid #edf2f7;
+  border-radius: 26px;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(23, 47, 82, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.registro-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.registro-field-label {
+  color: #203d66;
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 1.2;
+  margin-left: 4px;
+}
+
+.registro-input-shell {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border: 1.5px solid #e6ecf3;
+  border-radius: 14px;
+  background: #f8fafc;
+  transition: all 150ms ease;
+}
+
+.registro-input-shell:focus-within {
+  border-color: #1c3d69;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(28, 61, 105, 0.1);
+}
+
+.registro-input-shell.has-error {
+  border-color: #ef4444;
+  background: #fffafa;
+}
+
+.registro-input-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+  color: #8fa2ba;
+}
+
+.registro-input-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.3;
+}
+
+.registro-input-shell input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  color: #203d66;
+  background: transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.registro-input-shell input::placeholder {
+  color: #9ab0c8;
+}
+
+.registro-toggle-pwd {
+  border: none;
+  background: transparent;
+  color: #8fa2ba;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 150ms ease;
+}
+
+.registro-toggle-pwd:hover {
+  color: #203d66;
+}
+
+.registro-toggle-pwd svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+/* Mensajes de validación */
+.registro-feedback-error {
+  margin: 0;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  padding-left: 4px;
+}
+
+/* ==========================================================================
+   4. BOTÓN REGISTRARME Y NAVEGACIÓN
+   ========================================================================== */
+.btn-submit-registro {
+  height: 52px;
+  width: 100%;
+  border-radius: 9999px;
+  background: #1c3d69;
+  color: #ffffff;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 750;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(28, 61, 105, 0.28);
+  transition: all 180ms ease;
+  margin-top: 18px;
+}
+
+.btn-submit-registro:hover {
+  background: #153155;
+  transform: translateY(-1px);
+}
+
+.btn-submit-registro:active {
+  transform: translateY(0);
+}
+
+.registro-login-prompt {
+  text-align: center;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 16px 0 0;
+}
+
+.registro-login-prompt a {
+  color: #1c3d69;
+  font-weight: 750;
+  text-decoration: none;
+  margin-left: 4px;
+}
+
+.registro-login-prompt a:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   5. PIE DE PÁGINA
+   ========================================================================== */
+.registro-footer {
+  text-align: center;
+  color: #8fa2ba;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.registro-footer p {
+  margin: 0;
+}

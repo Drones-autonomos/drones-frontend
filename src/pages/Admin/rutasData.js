@@ -308,6 +308,30 @@ export function saveGeofences(geofences) {
   }
 }
 
+export const AUTONOMOUS_STORAGE_KEY = 'aeroluferan_autonomous_flight'
+
+export function getStoredAutonomous() {
+  try {
+    const raw = localStorage.getItem(AUTONOMOUS_STORAGE_KEY)
+    if (raw !== null) {
+      return JSON.parse(raw)
+    }
+  } catch {
+    // fallback
+  }
+  return true
+}
+
+export function saveAutonomous(enabled) {
+  try {
+    localStorage.setItem(AUTONOMOUS_STORAGE_KEY, JSON.stringify(enabled))
+    window.dispatchEvent(new CustomEvent('aeroluferan_autonomous_updated', { detail: enabled }))
+  } catch {
+    // ignore
+  }
+  return enabled
+}
+
 /**
  * Utilidad geométrica: Comprueba si un punto [lat, lng] está dentro de un bounding box [[latMin, lngMin], [latMax, lngMax]]
  */

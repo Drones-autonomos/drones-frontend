@@ -1,5 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import brandLogo from '../../assets/aeroluferan-logo.png'
+import {
+  DEFAULT_ADMIN_USER,
+  DEFAULT_GUARD_USER,
+  setCurrentUser,
+} from '../Admin/authSession.js'
 import './Login.css'
 
 const accountTypes = {
@@ -15,26 +21,11 @@ const accountTypes = {
 
 function BrandMark() {
   return (
-    <svg
+    <img
+      src={brandLogo}
       className="login-brand-mark"
-      viewBox="0 0 440 390"
-      role="img"
-      aria-label="Emblema de AeroLuferan: casco de vigilancia y dos drones"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M35 196c38-49 92-91 151-122l34 31-29 34c-38 12-79 37-109 66l46 8c-39 13-76 34-100 57-14 14-8 28 12 27 29-2 67-22 102-44" strokeWidth="9" />
-        <path d="M218 74c65-26 143-43 188-39 16 2 17 8 6 19-27 28-76 50-130 63l-39 14-30-27z" strokeWidth="9" />
-        <path d="M72 188c32-33 73-62 113-82M256 91c40-17 84-29 125-33-25 20-59 34-95 43" strokeWidth="5" />
-      </g>
-      <g fill="currentColor">
-        <path d="M177 244c7-66 43-103 99-103 19 0 37 6 52 17l20-21c36 38 56 87 62 138 2 16-8 21-19 7l-31-39-76-19-47 18 79 26 38 91c-46 0-94-8-137-30-37-4-79-3-119 4 21-30 34-59 40-89 7 1 13 1 20 0l19 0z" />
-        <path d="M149 159c-10 0-17 7-17 16 0 7 4 13 11 15l11 2 10-8-2-16-8-9zM331 85c-10 0-17 7-17 16 0 7 4 13 11 15l11 2 10-8-2-16-8-9z" />
-        <path d="M143 161l18-19 4 4-13 22zM325 87l18-19 4 4-13 22z" />
-        <circle cx="151" cy="168" r="4" />
-        <circle cx="333" cy="94" r="4" />
-      </g>
-    </svg>
+      alt="Emblema de AeroLuferan: casco de vigilancia y dos drones"
+    />
   )
 }
 
@@ -90,22 +81,43 @@ function EyeIcon({ visible }) {
 
 function Login() {
   const navigate = useNavigate()
-  const [accountType, setAccountType] = useState('guard')
-  const [email, setEmail] = useState(accountTypes.guard.email)
+  // Ningún tipo de usuario seleccionado inicialmente
+  const [accountType, setAccountType] = useState(null)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
+  // Selección del tipo de usuario (únicamente una opción a la vez, sin navegar inmediatamente)
   function selectAccount(type) {
     setAccountType(type)
+    setErrorMessage('')
     setEmail(accountTypes[type].email)
-
-    if (type === 'admin') {
-      navigate('/admin/live')
-    }
   }
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    // Validación obligatoria: si ninguna opción está seleccionada, bloquear avance y mostrar mensaje
+    if (!accountType) {
+      setErrorMessage(
+        'Es necesario seleccionar un tipo de usuario (Seguridad: Guardia o Académico: Admin) para iniciar sesión.',
+      )
+      return
+    }
+
+    setErrorMessage('')
+
+    // Establecer usuario autenticado según el rol seleccionado
+    if (accountType === 'guard') {
+      const user = { ...DEFAULT_GUARD_USER, email: email || accountTypes.guard.email }
+      setCurrentUser(user)
+      navigate('/guardia/live')
+    } else if (accountType === 'admin') {
+      const user = { ...DEFAULT_ADMIN_USER, email: email || accountTypes.admin.email }
+      setCurrentUser(user)
+      navigate('/admin/live')
+    }
   }
 
   return (
@@ -153,10 +165,19 @@ function Login() {
           </div>
         </section>
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <form className="login-form" onSubmit={handleSubmit} noValidate>
+          {errorMessage && (
+            <div className="login-error-alert" role="alert">
+              <span className="login-error-dot" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <label className="field-label" htmlFor="institutional-email">
             <span>Correo Institucional</span>
-            <span className="account-label">{accountTypes[accountType].label}</span>
+            <span className="account-label">
+              {accountType ? accountTypes[accountType].label : 'Selecciona una cuenta'}
+            </span>
           </label>
           <div className="input-shell">
             <AtIcon />
@@ -164,7 +185,11 @@ function Login() {
               id="institutional-email"
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value)
+                setErrorMessage('')
+              }}
+              placeholder={accountType ? accountTypes[accountType].email : 'nombre.apellido@admin.uaq.mx'}
               autoComplete="username"
             />
           </div>
@@ -180,6 +205,7 @@ function Login() {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="••••••••••••"
               autoComplete="current-password"
             />
             <button

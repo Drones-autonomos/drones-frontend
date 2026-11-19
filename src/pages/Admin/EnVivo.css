@@ -1191,3 +1191,135 @@
     padding: 0 7px;
   }
 }
+
+
+/* ============================================================== */
+/* Extensiones WebRTC y Controles Interactivos                    */
+/* ============================================================== */
+.live-preview__video {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-live-indicator--pending {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+.preview-live-dot--pending {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.drone-action--resume .drone-action__icon {
+  color: #007b59;
+  background: #b5f8df;
+}
+
+/* Modal de confirmación para parada inmediata */
+.emergency-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 150ms ease-out;
+}
+
+.emergency-modal {
+  width: min(100%, 480px);
+  padding: 32px 28px;
+  border: 2px solid #fecdd3;
+  border-radius: 36px;
+  background: #fff;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.22);
+  text-align: center;
+  animation: scaleIn 180ms ease-out;
+}
+
+.emergency-modal__icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #be123c;
+  background: #ffe4e6;
+}
+
+.emergency-modal__icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.emergency-modal h3 {
+  margin: 0 0 10px;
+  color: #1e293b;
+  font-size: 24px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.emergency-modal p {
+  margin: 0 0 26px;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.emergency-modal__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.emergency-modal__btn {
+  min-height: 54px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.emergency-modal__btn--cancel {
+  border: 2px solid #e2e8f0;
+  color: #475569;
+  background: #f8fafc;
+}
+
+.emergency-modal__btn--cancel:hover {
+  background: #e2e8f0;
+}
+
+.emergency-modal__btn--confirm {
+  border: 0;
+  color: #fff;
+  background: #be123c;
+  box-shadow: 0 4px 12px rgba(190, 18, 60, 0.35);
+}
+
+.emergency-modal__btn--confirm:hover {
+  background: #9f1239;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
