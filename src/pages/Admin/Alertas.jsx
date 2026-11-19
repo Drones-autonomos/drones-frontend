@@ -40,7 +40,7 @@ function Alertas() {
 
   const handleViewLive = (alert) => {
     markAsViewed(alert.id)
-    navigate('/admin/live', { state: { droneId: alert.droneName, alertId: alert.id } })
+    navigate('/admin/en-vivo', { state: { droneId: alert.droneName, alertId: alert.id } })
   }
 
   const handleDispatchGuard = (alert) => {
@@ -161,12 +161,17 @@ function Alertas() {
                   <div>{alert.description}</div>
                 </div>
 
-                {alert.type === 'intruso' && (
+                {alert.audit && (
                   <div className="alert-card__audit">
                     <span className="alert-card__audit-badge">
                       <CheckIcon />
-                      {alert.audit}
+                      {typeof alert.audit === 'object' ? alert.audit.text || alert.audit.code : alert.audit}
                     </span>
+                    {typeof alert.audit === 'object' && alert.audit.text && alert.audit.code && (
+                      <span className="alert-card__audit-code">
+                        {alert.audit.code}
+                      </span>
+                    )}
                   </div>
                 )}
 

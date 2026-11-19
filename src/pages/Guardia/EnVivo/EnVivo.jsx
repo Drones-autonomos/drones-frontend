@@ -257,7 +257,7 @@ function GuardiaEnVivo() {
       </main>
 
       {/* 3. Navegación Inferior - Perfil Guardia */}
-      <GuardiaBottomNav />
+      <GuardiaBottomNav activePath="/guardia/en-vivo" />
 
       {/* Modal de confirmación para parada inmediata */}
       <EmergencyStopModal

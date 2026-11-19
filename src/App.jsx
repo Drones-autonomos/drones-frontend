@@ -23,7 +23,8 @@ function App() {
         <Route path="/registro" element={<Registro />} />
 
         {/* Módulo Administrador Académico */}
-        <Route path="/admin" element={<Navigate to="/admin/live" replace />} />
+        <Route path="/admin" element={<Navigate to="/admin/en-vivo" replace />} />
+        <Route path="/admin/en-vivo" element={<EnVivo />} />
         <Route path="/admin/live" element={<EnVivo />} />
         <Route path="/admin/alertas" element={<Alertas />} />
         <Route path="/admin/rutas" element={<Rutas />} />
@@ -33,9 +34,10 @@ function App() {
         <Route path="/admin/ajustes/perfil" element={<Ajustes initialView="editProfile" />} />
 
         {/* Módulo Guardia de Seguridad */}
-        <Route path="/guardia" element={<Navigate to="/guardia/live" replace />} />
+        <Route path="/guardia" element={<Navigate to="/guardia/en-vivo" replace />} />
+        <Route path="/guardia/en-vivo" element={<GuardiaEnVivo />} />
         <Route path="/guardia/live" element={<GuardiaEnVivo />} />
-        <Route path="/guardia/envivo" element={<Navigate to="/guardia/live" replace />} />
+        <Route path="/guardia/envivo" element={<Navigate to="/guardia/en-vivo" replace />} />
         <Route path="/guardia/alertas" element={<GuardiaAlertas />} />
         <Route path="/guardia/rutas" element={<GuardiaRutas />} />
         <Route path="/guardia/programar-ruta" element={<Navigate to="/guardia/rutas" replace />} />

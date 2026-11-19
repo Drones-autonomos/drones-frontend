@@ -138,7 +138,7 @@ export default function GuardiaAlertas() {
   // Acción 1: Ver en Vivo (navega a /guardia/live con telemetría del dron y marca alerta como vista)
   const handleViewLive = (alert) => {
     markAsViewed(alert.id)
-    navigate('/guardia/live', {
+    navigate('/guardia/en-vivo', {
       state: {
         droneId: alert.droneName,
         alertId: alert.id,

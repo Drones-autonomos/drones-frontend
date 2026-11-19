@@ -124,7 +124,7 @@ export default function Registro() {
       })
 
       // Redirigir a la vista correspondiente
-      if (accountType === 'guard') { navigate('/guardia/live') } else { navigate('/admin/live') }
+      if (accountType === 'guard') { navigate('/guardia/en-vivo') } else { navigate('/admin/en-vivo') }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Error al registrar la cuenta.')
     }

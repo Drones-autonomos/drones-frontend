@@ -153,7 +153,7 @@ export default function Rutas() {
     })
 
     setTimeout(() => {
-      navigate('/admin/live', {
+      navigate('/admin/en-vivo', {
         state: {
           missionId: selectedMission.id,
           missionName: selectedMission.name,

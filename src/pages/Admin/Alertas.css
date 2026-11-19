@@ -494,6 +494,13 @@
   stroke-width: 2.3;
 }
 
+.alert-card__audit-code {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .alert-card__actions {
   display: flex;
   gap: 10px;

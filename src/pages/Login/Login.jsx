@@ -112,11 +112,11 @@ function Login() {
     if (accountType === 'guard') {
       const user = { ...DEFAULT_GUARD_USER, email: email || accountTypes.guard.email }
       setCurrentUser(user)
-      navigate('/guardia/live')
+      navigate('/guardia/en-vivo')
     } else if (accountType === 'admin') {
       const user = { ...DEFAULT_ADMIN_USER, email: email || accountTypes.admin.email }
       setCurrentUser(user)
-      navigate('/admin/live')
+      navigate('/admin/en-vivo')
     }
   }
 

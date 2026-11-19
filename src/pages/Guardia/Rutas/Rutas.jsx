@@ -195,7 +195,7 @@ export default function GuardiaRutas() {
     })
 
     setTimeout(() => {
-      navigate('/guardia/live', {
+      navigate('/guardia/en-vivo', {
         state: {
           missionId: selectedMission.id,
           missionName: selectedMission.name,

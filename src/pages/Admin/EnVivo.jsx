@@ -289,7 +289,7 @@ function EnVivo() {
       </main>
 
       {/* Navegación Inferior de Admin */}
-      <AdminBottomNav />
+      <AdminBottomNav activePath="/admin/en-vivo" />
 
       {/* Modal de confirmación para parada inmediata */}
       <EmergencyStopModal
