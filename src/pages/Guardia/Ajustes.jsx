@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import GuardiaBottomNav from '../../components/GuardiaBottomNav.jsx'
 import { AeroHelmetLogo, CloseModalIcon } from '../../components/BitacoraIcons.jsx'
+import { ToggleCheckIcon } from '../../components/RutasIcons.jsx'
 import {
   BackArrowIcon,
   BellPushIcon,
@@ -344,7 +345,6 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                 {/* Franja de estado de credencial y RBAC */}
                 <div className="edit-profile-badge-row">
                   <span className="profile-credential-status">
-                    <span className="status-dot" aria-hidden="true" />
                     <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
                   </span>
 
@@ -403,7 +403,6 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
 
               <div className="profile-card__bottom">
                 <span className="profile-credential-status">
-                  <span className="status-dot" aria-hidden="true" />
                   <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
                 </span>
 
@@ -511,7 +510,6 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                   onClick={() => setIsEncryptionModalOpen(true)}
                   title="Políticas de seguridad: Cifrado activo y bloqueado por normativa institucional"
                 >
-                  <span className="dot" aria-hidden="true" />
                   <span>BLOQUEADO ON</span>
                 </button>
               </div>
@@ -777,7 +775,7 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                       </span>
                     </div>
                     {settings.transmissionQualityId === q.id && (
-                      <span style={{ color: '#00649c', fontWeight: '800' }}>✓</span>
+                      <ToggleCheckIcon size={15} color="#00649c" />
                     )}
                   </button>
                 ))}

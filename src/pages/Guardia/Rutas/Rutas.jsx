@@ -12,9 +12,9 @@ import {
   NoEntryIcon,
   ShieldCheckIcon,
   SignalBarsIcon,
-  SignalWifiIcon,
   SunRouteIcon,
   ToggleCheckIcon,
+  WarningBoltIcon,
   WindBlowIcon,
 } from '../../../components/RutasIcons.jsx'
 import RutasMap from '../../Admin/RutasMap.jsx'
@@ -429,19 +429,11 @@ export default function GuardiaRutas() {
             <div className="rutas-brand-text">
               <h1 className="rutas-brand-title">AeroLuferan</h1>
               <div className="rutas-brand-subtitle">
-                <span className="status-dot-green" aria-hidden="true" />
                 <span>Geocerca & Rutas Activas</span>
               </div>
             </div>
           </div>
 
-          <div
-            className={`drone-signal-badge${!droneComm.isConnected ? ' is-disconnected' : ''}`}
-            title={`Calidad del enlace RF: ${droneComm.signalQuality}% · Estado: ${droneComm.isConnected ? 'Dron conectado' : 'Sin conexión con el dron'}`}
-          >
-            <SignalWifiIcon size={16} color={droneComm.isConnected ? '#10B981' : '#EF4444'} />
-            <span>{droneComm.isConnected ? `${droneComm.signalQuality}%` : 'Sin Señal'}</span>
-          </div>
         </header>
 
         <main className="rutas-content">
@@ -489,7 +481,6 @@ export default function GuardiaRutas() {
               </div>
 
               <div className="campus-live-pill">
-                <span className="live-pill-dot" aria-hidden="true" />
                 <span>En Vivo</span>
               </div>
             </header>
@@ -536,7 +527,7 @@ export default function GuardiaRutas() {
                 {routeValidation.hasCriticalConflict ? (
                   <NoEntryIcon size={16} color="#dc2626" />
                 ) : (
-                  <span>⚠️</span>
+                  <WarningBoltIcon size={16} color="#B45309" />
                 )}
                 <strong>
                   {routeValidation.hasCriticalConflict
@@ -602,7 +593,7 @@ export default function GuardiaRutas() {
 
             {missionsError && (
               <div className="missions-offline-banner" role="alert">
-                ⚠️ Sin conexión con el backend: {missionsError}
+                <WarningBoltIcon size={14} color="#B45309" /> Sin conexión con el backend: {missionsError}
               </div>
             )}
 

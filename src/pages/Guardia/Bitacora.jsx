@@ -85,7 +85,7 @@ function FlightHistoryCard({
           role="status"
           aria-label={flight.incidentBadge.hasIncidents ? `${flight.incidentBadge.count} incidencia reportada` : 'Sin incidencias'}
         >
-          <span className="incident-badge__dot" aria-hidden="true" />
+
           <div className="incident-badge__lines">
             <span>{flight.incidentBadge.textLine1}</span>
             <span>{flight.incidentBadge.textLine2}</span>
@@ -351,7 +351,7 @@ function VideoModal({ flight, onClose }) {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#15803d', fontWeight: '700' }}>
-            ✓ {flight.integrity.hash} · {flight.integrity.blockNumber}
+            <CheckShieldHashIcon size={13} color="#15803d" /> {flight.integrity.hash} · {flight.integrity.blockNumber}
           </span>
         </div>
       </div>

@@ -165,7 +165,7 @@ export function GeofenceManagerModal({
                         </div>
 
                         {zone.restrictionReason ? (
-                          <p className="geofence-item-reason">⚠️ {zone.restrictionReason}</p>
+                          <p className="geofence-item-reason"><WarningBoltIcon size={13} color="#B45309" /> {zone.restrictionReason}</p>
                         ) : (
                           <p className="geofence-item-desc">{zone.description || 'Zona operativa sin restricciones.'}</p>
                         )}

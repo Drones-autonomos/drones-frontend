@@ -342,21 +342,6 @@
   color: #14532d;
 }
 
-.incident-badge__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.incident-badge--danger .incident-badge__dot {
-  background: #dc2626;
-}
-
-.incident-badge--success .incident-badge__dot {
-  background: #16a34a;
-}
-
 .incident-badge__lines {
   display: flex;
   align-items: center;

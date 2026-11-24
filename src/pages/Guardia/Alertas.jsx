@@ -190,7 +190,6 @@ export default function GuardiaAlertas() {
 
           <div className="alertas-guardia-header-actions">
             <span className="alertas-guardia-status-pill" title="Patrullaje perimetral activo">
-              <span className="alertas-guardia-status-dot" aria-hidden="true" />
               En patrullaje
             </span>
             <button

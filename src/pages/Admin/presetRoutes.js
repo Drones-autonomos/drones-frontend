@@ -134,7 +134,7 @@ export const PRESET_ROUTES = [
 export const PATROL_BASES = [
   { id: 'home', label: 'HOME', tooltip: 'Base principal · Facultad de Informática', coords: HOME },
   { id: 'base1', label: 'B1', tooltip: 'Base 1 · acceso sureste del campus', coords: BASE_1 },
-  { id: 'base2', label: 'B2 ⚡', tooltip: 'Base 2 · base de carga (estacionamiento noroeste)', coords: BASE_2 },
+  { id: 'base2', label: 'B2', tooltip: 'Base 2 · base de carga (estacionamiento noroeste)', coords: BASE_2 },
 ]
 
 export { HOME }

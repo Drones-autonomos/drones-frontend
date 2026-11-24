@@ -44,17 +44,6 @@
   fill: currentColor;
 }
 
-.live-header__drone-icon > span {
-  position: absolute;
-  right: -5px;
-  bottom: -3px;
-  width: 25px;
-  height: 25px;
-  border: 3px solid #fff;
-  border-radius: 50%;
-  background: #007954;
-}
-
 .live-header__brand-copy {
   min-width: 0;
   display: flex;
@@ -96,34 +85,6 @@
   font-weight: 650;
 }
 
-.live-header__signal {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 13px 20px;
-  border-radius: 999px;
-  color: #007b5a;
-  background: #b6f8df;
-  font-size: 22px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.live-header__signal > svg {
-  width: 19px;
-  height: 19px;
-  fill: currentColor;
-  stroke: none;
-}
-
-.live-header__signal small {
-  padding: 3px 6px;
-  border-radius: 999px;
-  background: rgb(0 121 84 / 11%);
-  font-size: 11px;
-  font-weight: 800;
-}
 
 .live-content {
   width: 100%;
@@ -280,13 +241,6 @@
   font-weight: 800;
 }
 
-.preview-live-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-}
-
 .preview-quality,
 .preview-encryption {
   background: rgb(57 66 69 / 61%);
@@ -363,12 +317,16 @@
   box-shadow: 0 4px 10px rgb(24 37 47 / 16%);
 }
 
-.preview-area-dot {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  border-radius: 50%;
-  background: #007b59;
+.preview-area-status strong svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: #007b59;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+  vertical-align: -3px;
+  margin-right: 3px;
 }
 
 .preview-area-status > span:last-child {
@@ -850,11 +808,6 @@
     height: 32px;
   }
 
-  .live-header__drone-icon > span {
-    width: 20px;
-    height: 20px;
-  }
-
   .live-header__brand-copy > h1 {
     font-size: clamp(20px, 5vw, 27px);
   }
@@ -869,22 +822,6 @@
   .live-header__brand-copy i {
     width: 5px;
     height: 5px;
-  }
-
-  .live-header__signal {
-    gap: 5px;
-    padding: 10px 12px;
-    font-size: clamp(12px, 3.3vw, 16px);
-  }
-
-  .live-header__signal > svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  .live-header__signal small {
-    padding: 2px 4px;
-    font-size: 8px;
   }
 
   .live-content {
@@ -952,11 +889,6 @@
     font-size: clamp(11px, 3vw, 15px);
   }
 
-  .preview-live-dot {
-    width: 8px;
-    height: 8px;
-  }
-
   .preview-encryption svg {
     width: 15px;
     height: 15px;
@@ -983,12 +915,6 @@
     min-width: 0;
     gap: 9px;
     padding: 7px 13px;
-  }
-
-  .preview-area-dot {
-    width: 11px;
-    height: 11px;
-    flex-basis: 11px;
   }
 
   .preview-area-status > span:last-child {
@@ -1207,10 +1133,6 @@
     flex-basis: 48px;
   }
 
-  .live-header__signal {
-    padding: 8px 9px;
-  }
-
   .live-content {
     padding-right: 12px;
     padding-left: 12px;
@@ -1271,11 +1193,6 @@
 .preview-live-indicator--pending {
   background: #334155;
   color: #f1f5f9;
-}
-
-.preview-live-dot--pending {
-  background: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
 }
 
 .drone-action--resume .drone-action__icon {

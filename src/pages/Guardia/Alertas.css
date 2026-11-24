@@ -96,15 +96,6 @@
   white-space: nowrap;
 }
 
-.alertas-guardia-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #1fc082;
-  box-shadow: 0 0 0 2px rgba(31, 192, 130, 0.25);
-  display: inline-block;
-}
-
 .alertas-guardia-notification-button {
   width: 36px;
   height: 36px;

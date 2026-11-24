@@ -87,14 +87,6 @@
   border: 1px solid rgba(17, 126, 96, 0.15);
 }
 
-.alertas-status-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #1fc082;
-  box-shadow: 0 0 0 2px rgba(31, 192, 130, 0.2);
-}
-
 .alertas-notification-button {
   width: 34px;
   height: 34px;
@@ -135,14 +127,6 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
-}
-
-.monitor-card__dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #71d3b2, #26a87a);
-  box-shadow: 0 0 0 3px rgba(39, 186, 127, 0.15);
 }
 
 .monitor-card__title {

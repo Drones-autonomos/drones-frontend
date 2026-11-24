@@ -69,7 +69,6 @@ function Alertas() {
 
           <div className="alertas-header-actions">
             <span className="alertas-status-pill">
-              <span className="alertas-status-dot" aria-hidden="true" />
               En patrullaje
             </span>
             <button type="button" className="alertas-notification-button" aria-label="Notificaciones">
@@ -80,7 +79,6 @@ function Alertas() {
 
         <section className="monitor-card" aria-label="Estado de monitoreo perimetral">
           <div className="monitor-card__label">
-            <span className="monitor-card__dot" aria-hidden="true" />
             <div>
               <div className="monitor-card__title">Monitoreo Perimetral Activo</div>
               <div className="monitor-card__details">Latencia en tiempo real &lt; 850ms</div>

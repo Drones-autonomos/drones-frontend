@@ -5,12 +5,14 @@ import {
   BackArrowIcon,
   ClearInputIcon,
   ClockPlanIcon,
+  EditIcon,
   ForkRouteIcon,
   HelmetBrandLogo,
   LightningBoltIcon,
   ShieldCheckIcon,
   ShieldOutlineIcon,
   VerifiedCheckBadgeIcon,
+  WarningBoltIcon,
 } from '../../components/RutasIcons.jsx'
 import RutasMap from './RutasMap.jsx'
 import {
@@ -446,7 +448,7 @@ export default function ProgramarRuta() {
 
             {isEditMode && (
               <div className="waypoint-warning-box" role="note">
-                <strong>ℹ️ Edición de misión:</strong> Los waypoints no se pueden modificar
+                <strong><EditIcon size={13} color="#0284C7" /> Edición de misión:</strong> Los waypoints no se pueden modificar
                 (el backend solo permite actualizar nombre, descripción y horario en una
                 misión PROGRAMADA).
               </div>
@@ -455,7 +457,7 @@ export default function ProgramarRuta() {
             {/* Advertencia si la trayectoria propuesta cruza una geocerca */}
             {routeValidation.conflicts.length > 0 && (
               <div className="waypoint-warning-box" role="alert">
-                <strong>⚠️ Intersección detectada:</strong> La ruta cruza la zona{' '}
+                <strong><WarningBoltIcon size={13} color="#B45309" /> Intersección detectada:</strong> La ruta cruza la zona{' '}
                 <em>"{routeValidation.conflicts[0].zoneName}"</em> ({routeValidation.conflicts[0].type}).
               </div>
             )}
@@ -595,13 +597,13 @@ export default function ProgramarRuta() {
           {/* Mensajes de error o éxito al guardar */}
           {formError && (
             <div className="programar-feedback-alert" role="alert">
-              ⚠️ {formError}
+              <WarningBoltIcon size={14} color="#B45309" /> {formError}
             </div>
           )}
 
           {saveSuccess && (
             <div className="programar-feedback-success" role="status">
-              ✓ {isEditMode
+              <VerifiedCheckBadgeIcon size={15} color="#15803d" /> {isEditMode
                 ? '¡Misión actualizada exitosamente! Volviendo a Rutas...'
                 : '¡Misión programada exitosamente! Guardando en Rutas...'}
             </div>

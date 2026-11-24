@@ -3,6 +3,7 @@ import campusReference from '../assets/campus-reference.svg'
 import { captureSnapshotFrame } from '../services/videoService.js'
 import {
   CameraIcon,
+  CheckIcon,
   CompassIcon,
   CompressIcon,
   ExpandIcon,
@@ -118,12 +119,10 @@ export function DroneVideoPlayer({
         <div className="preview-topline">
           {isLive ? (
             <span className="preview-live-indicator">
-              <span className="preview-live-dot" />
               EN VIVO
             </span>
           ) : (
             <span className="preview-live-indicator preview-live-indicator--pending">
-              <span className="preview-live-dot preview-live-dot--pending" />
               {connectionState === 'connecting'
                 ? 'CONECTANDO...'
                 : connectionState === 'disconnected'
@@ -153,9 +152,8 @@ export function DroneVideoPlayer({
 
         {/* Estado de la zona observada */}
         <div className="preview-area-status">
-          <span className="preview-area-dot" />
           <span>
-            <strong>✓ {preview.observedArea}</strong>
+            <strong><CheckIcon /> {preview.observedArea}</strong>
             <span>{preview.areaStatus}</span>
           </span>
         </div>

@@ -411,7 +411,6 @@ export default function Ajustes({ initialView = 'main' }) {
                 {/* Franja de estado de credencial y RBAC */}
                 <div className="edit-profile-badge-row">
                   <span className="profile-credential-status">
-                    <span className="status-dot" aria-hidden="true" />
                     <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
                   </span>
 
@@ -471,7 +470,6 @@ export default function Ajustes({ initialView = 'main' }) {
 
               <div className="profile-card__bottom">
                 <span className="profile-credential-status">
-                  <span className="status-dot" aria-hidden="true" />
                   <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
                 </span>
 
@@ -633,7 +631,6 @@ export default function Ajustes({ initialView = 'main' }) {
                   onClick={() => setIsEncryptionModalOpen(true)}
                   title="Políticas de seguridad: Cifrado activo y bloqueado por normativa institucional"
                 >
-                  <span className="dot" aria-hidden="true" />
                   <span>BLOQUEADO ON</span>
                 </button>
               </div>

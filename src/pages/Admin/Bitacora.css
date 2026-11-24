@@ -347,21 +347,6 @@
   border: 1px solid #6ee7b7;
 }
 
-.incident-badge__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.incident-badge--danger .incident-badge__dot {
-  background: #dc2626;
-}
-
-.incident-badge--success .incident-badge__dot {
-  background: #059669;
-}
-
 .incident-badge__lines {
   display: flex;
   flex-direction: column;

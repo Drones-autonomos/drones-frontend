@@ -16,6 +16,7 @@ import {
   SignalWifiIcon,
   SunRouteIcon,
   ToggleCheckIcon,
+  WarningBoltIcon,
   WindBlowIcon,
 } from '../../components/RutasIcons.jsx'
 import RutasMap from './RutasMap.jsx'
@@ -447,37 +448,28 @@ export default function Rutas() {
             <div className="rutas-brand-text">
               <h1 className="rutas-brand-title">AeroLuferan</h1>
               <div className="rutas-brand-subtitle">
-                <span className="status-dot-green" aria-hidden="true" />
                 <span>Geocerca & Rutas Activas</span>
               </div>
             </div>
           </div>
 
-          <div
-            className={`drone-signal-badge${!droneComm.isConnected ? ' is-disconnected' : ''}`}
-            onClick={() => {
-              if (!droneComm.isConnected && pendingActionId === null) handleConnectDrone()
-            }}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if ((e.key === 'Enter' || e.key === ' ') && !droneComm.isConnected) handleConnectDrone()
-            }}
-            title={
-              droneComm.isConnected
-                ? `Calidad del enlace RF: ${droneComm.signalQuality}% · Dron conectado`
-                : 'Sin conexión con el dron · Clic para conectar vía MAVLink (ADMIN)'
-            }
-          >
-            <SignalWifiIcon size={16} color={droneComm.isConnected ? '#10B981' : '#EF4444'} />
-            <span>
-              {droneComm.isConnected
-                ? `${droneComm.signalQuality}%`
-                : pendingActionId === -1
-                  ? 'Conectando…'
-                  : 'Sin Señal'}
-            </span>
-          </div>
+          {!droneComm.isConnected && (
+            <div
+              className="drone-signal-badge is-disconnected"
+              onClick={() => {
+                if (pendingActionId === null) handleConnectDrone()
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && pendingActionId === null) handleConnectDrone()
+              }}
+              title="Sin conexión con el dron · Clic para conectar vía MAVLink (ADMIN)"
+            >
+              <SignalWifiIcon size={16} color="#EF4444" />
+              <span>{pendingActionId === -1 ? 'Conectando…' : 'Sin Señal'}</span>
+            </div>
+          )}
         </header>
 
         <main className="rutas-content">
@@ -525,7 +517,6 @@ export default function Rutas() {
               </div>
 
               <div className="campus-live-pill">
-                <span className="live-pill-dot" aria-hidden="true" />
                 <span>En Vivo</span>
               </div>
             </header>
@@ -572,7 +563,7 @@ export default function Rutas() {
                 {routeValidation.hasCriticalConflict ? (
                   <NoEntryIcon size={16} color="#dc2626" />
                 ) : (
-                  <span>⚠️</span>
+                  <WarningBoltIcon size={16} color="#B45309" />
                 )}
                 <strong>
                   {routeValidation.hasCriticalConflict
@@ -636,7 +627,7 @@ export default function Rutas() {
 
             {missionsError && (
               <div className="missions-offline-banner" role="alert">
-                ⚠️ Sin conexión con el backend: {missionsError}
+                <WarningBoltIcon size={14} color="#B45309" /> Sin conexión con el backend: {missionsError}
               </div>
             )}
 

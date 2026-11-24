@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
 import DroneVideoPlayer from '../../components/DroneVideoPlayer.jsx'
 import EmergencyStopModal from '../../components/EmergencyStopModal.jsx'
@@ -14,12 +15,17 @@ import {
   PlayIcon,
   SatelliteIcon,
   ShieldIcon,
-  SignalIcon,
   StopIcon,
   WindIcon,
 } from '../../components/EnVivoIcons.jsx'
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
 import useLiveVideoStream from '../../hooks/useLiveVideoStream.js'
+import {
+  confirmMissionLanded,
+  startMission,
+} from '../../services/missionService.js'
+import droneControlService from '../../services/droneControlService.js'
+import { refreshTelemetry } from '../../services/telemetryService.js'
 import {
   requestArmFailsafe,
   requestEmergencyStop,
@@ -36,14 +42,24 @@ const telemetryIcons = {
   gps: SatelliteIcon,
 }
 
+const MISSION_EYEBROW = {
+  PROGRAMADA: 'MISIÓN PROGRAMADA',
+  EN_CURSO: 'VUELO ACTIVO',
+  RECUPERACION: 'EN RECUPERACIÓN',
+  CANCELANDO: 'CANCELANDO',
+}
+
 function FlightCard({ flight }) {
+  const eyebrow = flight.missionEstado
+    ? MISSION_EYEBROW[flight.missionEstado] || flight.missionEstado
+    : 'MISIÓN'
   return (
     <section className="flight-card" aria-label="Vuelo activo">
       <span className="flight-card__icon">
         <CompassIcon />
       </span>
       <div className="flight-card__details">
-        <span className="flight-card__eyebrow">VUELO ACTIVO</span>
+        <span className="flight-card__eyebrow">{eyebrow}</span>
         <strong>{flight.route}</strong>
       </div>
       <span className="flight-card__milestone">
@@ -69,7 +85,7 @@ function TelemetryCard({ item }) {
   )
 }
 
-function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onArmFailsafe, onRequestEmergencyStop, actionMessage }) {
+function QuickActions({ mode, isPaused, missionEstado, missionBusy, onStartMission, onConfirmLanded, onStartPreset, onScheduleRoute, onTogglePause, onReturnToBase, onArmFailsafe, onRequestEmergencyStop, actionMessage }) {
   return (
     <section className="quick-actions" aria-labelledby="quick-actions-title">
       <div className="quick-actions__heading">
@@ -77,16 +93,72 @@ function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onArmFail
         <span>{mode}</span>
       </div>
       <div className="quick-actions__buttons">
-        <button
-          className={`drone-action${isPaused ? ' drone-action--resume' : ''}`}
-          type="button"
-          onClick={onTogglePause}
-        >
-          <span className="drone-action__icon">
-            {isPaused ? <PlayIcon /> : <PauseIcon />}
-          </span>
-          <span>{isPaused ? 'Reanudar Vuelo' : 'Pausar Vuelo'}</span>
-        </button>
+        {missionEstado === 'PROGRAMADA' && (
+          <button
+            className="drone-action drone-action--mission"
+            type="button"
+            onClick={onStartMission}
+            disabled={missionBusy}
+          >
+            <span className="drone-action__icon">
+              <PlayIcon />
+            </span>
+            <span>{missionBusy ? 'Iniciando…' : 'Iniciar Misión'}</span>
+          </button>
+        )}
+
+        {missionEstado === 'RECUPERACION' && (
+          <button
+            className="drone-action drone-action--mission"
+            type="button"
+            onClick={onConfirmLanded}
+            disabled={missionBusy}
+          >
+            <span className="drone-action__icon">
+              <CheckIcon />
+            </span>
+            <span>{missionBusy ? 'Confirmando…' : 'Confirmar Aterrizaje'}</span>
+          </button>
+        )}
+
+        {!missionEstado && (
+          <>
+            <button
+              className="drone-action drone-action--mission"
+              type="button"
+              onClick={onStartPreset}
+              disabled={missionBusy}
+            >
+              <span className="drone-action__icon">
+                <PlayIcon />
+              </span>
+              <span>{missionBusy ? 'Iniciando…' : 'Iniciar Ruta'}</span>
+            </button>
+            <button
+              className="drone-action"
+              type="button"
+              onClick={onScheduleRoute}
+            >
+              <span className="drone-action__icon">
+                <CompassIcon />
+              </span>
+              <span>Programar Ruta</span>
+            </button>
+          </>
+        )}
+
+        {(missionEstado === 'EN_CURSO' || isPaused) && (
+          <button
+            className={`drone-action${isPaused ? ' drone-action--resume' : ''}`}
+            type="button"
+            onClick={onTogglePause}
+          >
+            <span className="drone-action__icon">
+              {isPaused ? <PlayIcon /> : <PauseIcon />}
+            </span>
+            <span>{isPaused ? 'Reanudar Vuelo' : 'Pausar Vuelo'}</span>
+          </button>
+        )}
 
         <button
           className="drone-action"
@@ -110,16 +182,18 @@ function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onArmFail
           <span>Armar Failsafe GCS</span>
         </button>
 
-        <button
-          className="drone-action drone-action--emergency"
-          type="button"
-          onClick={onRequestEmergencyStop}
-        >
-          <span className="drone-action__icon">
-            <StopIcon />
-          </span>
-          <span>Detener Vuelo / Parada Inmediata</span>
-        </button>
+        {(missionEstado === 'EN_CURSO' || isPaused) && (
+          <button
+            className="drone-action drone-action--emergency"
+            type="button"
+            onClick={onRequestEmergencyStop}
+          >
+            <span className="drone-action__icon">
+              <StopIcon />
+            </span>
+            <span>Detener Vuelo / Parada Inmediata</span>
+          </button>
+        )}
 
         {actionMessage && (
           <p className="drone-action-message" role="status">
@@ -156,6 +230,7 @@ function HeliportCard({ heliport }) {
 }
 
 function EnVivo() {
+  const navigate = useNavigate()
   const { drone, flight, preview, cards, quickActions, heliport } = useDroneTelemetry()
   const { streamUrl, isLive, connectionState, info: streamInfo } = useLiveVideoStream()
 
@@ -163,6 +238,61 @@ function EnVivo() {
   const [actionMessage, setActionMessage] = useState('')
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
   const [isEmergencyStopping, setIsEmergencyStopping] = useState(false)
+  const [missionBusy, setMissionBusy] = useState(false)
+
+  async function handleStartMission() {
+    if (!flight.missionId) return
+    try {
+      setMissionBusy(true)
+      setActionMessage('')
+      await startMission(flight.missionId)
+      setActionMessage(`Misión "${flight.route}" iniciada.`)
+      await refreshTelemetry()
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo iniciar la misión.',
+      )
+    } finally {
+      setMissionBusy(false)
+    }
+  }
+
+  async function handleConfirmLanded() {
+    if (!flight.missionId) return
+    try {
+      setMissionBusy(true)
+      setActionMessage('')
+      await confirmMissionLanded(flight.missionId)
+      setActionMessage(`Aterrizaje confirmado: "${flight.route}" finalizada.`)
+      await refreshTelemetry()
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo confirmar el aterrizaje.',
+      )
+    } finally {
+      setMissionBusy(false)
+    }
+  }
+
+  function handleScheduleRoute() {
+    navigate('/admin/programar-ruta')
+  }
+
+  async function handleStartPreset() {
+    try {
+      setMissionBusy(true)
+      setActionMessage('')
+      const result = await droneControlService.startPresetPatrol('clasica')
+      setActionMessage(result?.status || 'Patrullaje iniciado.')
+      await refreshTelemetry()
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo iniciar la ruta.',
+      )
+    } finally {
+      setMissionBusy(false)
+    }
+  }
 
   async function handleTogglePause() {
     try {
@@ -229,7 +359,6 @@ function EnVivo() {
         <div className="live-header__brand">
           <span className="live-header__drone-icon">
             <PlaneIcon />
-            <span />
           </span>
           <div className="live-header__brand-copy">
             <h1>{drone.name}</h1>
@@ -238,10 +367,6 @@ function EnVivo() {
             </span>
           </div>
         </div>
-        <span className="live-header__signal">
-          <SignalIcon />
-          {drone.signalPercentage}% Señal
-        </span>
       </header>
 
       {/* Contenido Principal */}
@@ -275,6 +400,12 @@ function EnVivo() {
         <QuickActions
           mode={quickActions?.mode || flight.mode}
           isPaused={isPaused}
+          missionEstado={flight.missionEstado}
+          missionBusy={missionBusy}
+          onStartMission={handleStartMission}
+          onConfirmLanded={handleConfirmLanded}
+          onStartPreset={handleStartPreset}
+          onScheduleRoute={handleScheduleRoute}
           onTogglePause={handleTogglePause}
           onReturnToBase={handleReturnToBase}
           onArmFailsafe={handleArmFailsafe}

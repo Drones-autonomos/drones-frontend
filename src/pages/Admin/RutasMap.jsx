@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { CompassTargetIcon } from '../../components/RutasIcons.jsx'
 import { CAMPUS_CENTER, CAMPUS_DEFAULT_ZOOM } from './rutasData.js'
 import { PATROL_BASES } from './presetRoutes.js'
 
@@ -393,10 +394,11 @@ export default function RutasMap({
 
       {isDrawingMode && (
         <div className="map-drawing-banner">
-          <span>
+          <span className="map-drawing-banner__text">
+            <CompassTargetIcon size={15} color="#0284C7" />
             {!firstCorner
-              ? '📍 Haz clic en el mapa para fijar la primera esquina.'
-              : '📐 Haz clic para fijar la esquina opuesta del rectángulo.'}
+              ? ' Haz clic en el mapa para fijar la primera esquina.'
+              : ' Haz clic para fijar la esquina opuesta del rectángulo.'}
           </span>
           <button type="button" onClick={handleCancel} className="map-btn-cancel-draw">
             Cancelar
@@ -410,7 +412,7 @@ export default function RutasMap({
         title="Centrar en Facultad de Informática"
         onClick={handleResetView}
       >
-        🎯
+        <CompassTargetIcon size={20} color="#0284C7" />
       </button>
     </div>
   )
