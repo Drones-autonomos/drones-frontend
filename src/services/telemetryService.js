@@ -7,7 +7,8 @@
  *     el servidor cierra si no recibe mensajes en ~5 s).
  *   - REST       GET /api/v1/telemetry/current  (fallback y campos extra:
  *     velocidad, rumbo, voltaje, heartbeat).
- *   - REST       GET /api/v1/missions/?estado=EN_CURSO (misión activa).
+ *   - REST       GET /api/v1/missions/ (misión relevante: EN_CURSO,
+ *     luego RECUPERACION, luego la próxima PROGRAMADA).
  *   - REST       GET /api/v1/drone/charging-base (estado del helipuerto).
  *
  * Estrategia de transporte:
@@ -20,7 +21,7 @@
  */
 
 import apiClient, { ApiError, buildWsUrl, getAuthToken } from './apiClient.js'
-import { getActiveMission } from './missionService.js'
+import { getRelevantMission } from './missionService.js'
 
 const WS_STATUS_INTERVAL_MS = 2000
 const REST_POLL_INTERVAL_MS = 5000
@@ -28,6 +29,10 @@ const MISSION_POLL_INTERVAL_MS = 15000
 const BASE_POLL_INTERVAL_MS = 20000
 const WS_RECONNECT_MIN_MS = 1000
 const WS_RECONNECT_MAX_MS = 30000
+
+// TODO PRUEBAS: dron reportado siempre como conectado en `telemetry.link`.
+// REVERTIR antes de producción — solo para validar el flujo sin vehículo.
+const SIMULATE_DRONE_CONNECTED = true
 
 // Estado inicial de telemetría (valores neutros hasta recibir datos reales)
 let currentTelemetry = {
@@ -42,6 +47,8 @@ let currentTelemetry = {
     route: 'Sin misión activa',
     milestone: 0,
     totalMilestones: 0,
+    missionId: null,
+    missionEstado: null,
     mode: '—',
     isPaused: false,
     isReturningToBase: false,
@@ -63,7 +70,8 @@ let currentTelemetry = {
   ],
   heliport: {
     name: 'Helipuerto Norte #01',
-    stationNumber: '01',
+    stationId: null,
+    stationNumber: '—',
     landingSystem: 'Pad de inducción magnética',
     availability: '—',
     protectionDome: 'Domo protector abierto',
@@ -71,7 +79,7 @@ let currentTelemetry = {
   },
   link: {
     backendReachable: false,
-    droneConnected: false,
+    droneConnected: SIMULATE_DRONE_CONNECTED,
     transport: 'offline', // 'ws' | 'polling' | 'offline'
     lastUpdate: null,
   },
@@ -95,13 +103,26 @@ let vehicle = {
   heartbeatAge: null,
   timestamp: null,
   stream: null,
+  windKmh: null,
+  windDeg: null,
+  satellites: null,
+  gpsFix: null,
+  tiltDeg: null,
+  signalPct: null,
+  latencyMs: null,
+  zonaActual: null,
+  estadoZona: null,
+  failsafeGcs: null,
+  paused: false,
 }
 
 let activeMission = null
 let chargingBase = null
+let chargingBases = []
+let activeStationId = 'helipuerto_norte'
 const linkState = {
   backendReachable: false,
-  droneConnected: false,
+  droneConnected: SIMULATE_DRONE_CONNECTED,
   transport: 'offline',
   lastUpdate: null,
 }
@@ -212,6 +233,7 @@ function compassDirection(deg) {
 
 function computeSignalPercentage() {
   if (!linkState.backendReachable || !vehicle.connected) return 0
+  if (vehicle.signalPct != null) return Math.max(0, Math.min(100, Math.round(vehicle.signalPct)))
   if (vehicle.enlace === 'PERDIDA_SENAL') return 12
   if (vehicle.heartbeatAge != null) {
     return Math.max(10, Math.min(98, Math.round(100 - vehicle.heartbeatAge * 12)))
@@ -222,6 +244,7 @@ function computeSignalPercentage() {
 function computePatrolStatus() {
   if (!linkState.backendReachable) return 'Sin conexión'
   if (!vehicle.connected) return 'Dron sin conexión'
+  if (vehicle.paused) return 'Vuelo Pausado'
   if (vehicle.mode === 'RTL') return 'Regresando a Base'
   if (vehicle.armed) return 'En Patrullaje'
   return 'En tierra'
@@ -257,23 +280,30 @@ function buildCards() {
     },
     {
       id: 'wind',
-      value: '—',
-      speedKmh: null,
-      detail: 'Sin estación',
-      status: '',
+      value: vehicle.windKmh != null ? `${Math.round(vehicle.windKmh)} km/h` : '—',
+      speedKmh: vehicle.windKmh,
+      detail:
+        vehicle.windDeg != null
+          ? `${Math.round(vehicle.windDeg)}° ${compassDirection(vehicle.windDeg)}`
+          : hasData
+            ? 'Sin datos'
+            : 'Sin conexión',
+      status: vehicle.windKmh != null ? 'ok' : '',
       label: 'Viento',
       unit: 'km/h',
     },
     {
       id: 'gps',
       value: vehicle.connected && vehicle.lat != null ? 'GPS Fix' : 'Sin fix',
-      satellites: null,
+      satellites: vehicle.satellites,
       detail:
-        vehicle.lat != null && vehicle.lon != null
-          ? `${Number(vehicle.lat).toFixed(5)}, ${Number(vehicle.lon).toFixed(5)}`
-          : hasData
-            ? 'Sin posición'
-            : 'Sin conexión',
+        vehicle.satellites != null
+          ? `${vehicle.satellites} satélites · fix ${vehicle.gpsFix ?? '—'}`
+          : vehicle.lat != null && vehicle.lon != null
+            ? `${Number(vehicle.lat).toFixed(5)}, ${Number(vehicle.lon).toFixed(5)}`
+            : hasData
+              ? 'Sin posición'
+              : 'Sin conexión',
       status: vehicle.lat != null ? 'ok' : '',
       label: 'GPS',
       unit: 'Sat',
@@ -296,6 +326,14 @@ function buildHeliport() {
   }
   return {
     ...base,
+    name: chargingBase.nombre || base.name,
+    stationId: chargingBase.station_id || activeStationId,
+    stationNumber: chargingBase.codigo || chargingBase.station_id || base.stationNumber,
+    stations: chargingBases,
+    landingSystem: chargingBase.sistema_aterrizaje || base.landingSystem,
+    protectionDome: chargingBase.domo_estado
+      ? `Domo protector ${String(chargingBase.domo_estado).toLowerCase()}`
+      : base.protectionDome,
     availability: estadoUi.availability,
     landingStatus:
       chargingBase.bateria_porcentaje != null
@@ -316,8 +354,12 @@ function rebuildTelemetry() {
       route: activeMission?.name || 'Sin misión activa',
       milestone: activeMission?.waypoints_completados ?? 0,
       totalMilestones: activeMission?.waypoints?.length ?? 0,
+      missionId: activeMission?.id ?? null,
+      missionEstado: activeMission?.estado ?? null,
       mode: vehicle.mode || '—',
-      isPaused: false,
+      armed: Boolean(vehicle.armed),
+      failsafeGcs: vehicle.failsafeGcs,
+      isPaused: Boolean(vehicle.paused),
       isReturningToBase: vehicle.mode === 'RTL',
     },
     quickActions: { mode: vehicle.mode || '—' },
@@ -328,14 +370,17 @@ function rebuildTelemetry() {
           ? `${stream.resolucion}${stream.fps ? ` ${stream.fps}fps` : ''}`
           : '—',
       encryption: 'AES-256',
-      observedArea: 'Campus FIF',
-      areaStatus: vehicle.connected ? 'Monitoreo' : '—',
+      observedArea: vehicle.zonaActual || 'Campus FIF',
+      areaStatus: vehicle.estadoZona || (vehicle.connected ? 'Monitoreo' : '—'),
       heading: rumbo != null ? `HDG ${Math.round(rumbo)}° ${compassDirection(rumbo)}` : 'HDG —',
-      tilt: '—',
+      tilt: vehicle.tiltDeg != null ? `${Number(vehicle.tiltDeg).toFixed(1)}°` : '—',
     },
     cards: buildCards(),
     heliport: buildHeliport(),
-    link: { ...linkState },
+    link: {
+      ...linkState,
+      droneConnected: linkState.droneConnected || SIMULATE_DRONE_CONNECTED,
+    },
     position: { lat: vehicle.lat, lon: vehicle.lon },
     raw: { ...vehicle, mission: activeMission, chargingBase },
   })
@@ -347,25 +392,37 @@ function rebuildTelemetry() {
 
 function mergeSnapshot(payload, source) {
   if (!payload || typeof payload !== 'object') return
+  const disconnected = payload.connected === false
 
   vehicle = {
     connected: payload.connected ?? vehicle.connected,
-    armed: payload.armado ?? payload.armed ?? vehicle.armed,
-    mode: payload.modo_vuelo ?? payload.mode ?? vehicle.mode,
-    lat: payload.latitud ?? vehicle.lat,
-    lon: payload.longitud ?? vehicle.lon,
-    alt: payload.altitud_metros ?? payload.altitud_m ?? vehicle.alt,
-    batt: payload.bateria_porcentaje ?? payload.bateria_pct ?? vehicle.batt,
-    voltaje: payload.voltaje_bateria ?? vehicle.voltaje,
-    vel: payload.velocidad_tierra_ms ?? vehicle.vel,
-    rumbo: payload.rumbo_grados ?? vehicle.rumbo,
-    enlace: payload.estado_enlace ?? (source === 'ws' ? vehicle.enlace : 'OK'),
-    heartbeatAge: payload.heartbeat_age_s ?? vehicle.heartbeatAge,
+    armed: disconnected ? false : payload.armado ?? payload.armed ?? vehicle.armed,
+    mode: disconnected ? null : payload.modo_vuelo ?? payload.mode ?? vehicle.mode,
+    lat: disconnected ? null : payload.latitud ?? vehicle.lat,
+    lon: disconnected ? null : payload.longitud ?? vehicle.lon,
+    alt: disconnected ? null : payload.altitud_metros ?? payload.altitud_m ?? vehicle.alt,
+    batt: disconnected ? null : payload.bateria_porcentaje ?? payload.bateria_pct ?? vehicle.batt,
+    voltaje: disconnected ? null : payload.voltaje_bateria ?? vehicle.voltaje,
+    vel: disconnected ? null : payload.velocidad_tierra_ms ?? vehicle.vel,
+    rumbo: disconnected ? null : payload.rumbo_grados ?? vehicle.rumbo,
+    enlace: payload.estado_enlace ?? (disconnected ? 'DESCONECTADO' : source === 'ws' ? vehicle.enlace : 'OK'),
+    heartbeatAge: disconnected ? null : payload.heartbeat_age_s ?? vehicle.heartbeatAge,
     timestamp: payload.timestamp ?? new Date().toISOString(),
-    stream: payload.stream ?? vehicle.stream,
+    stream: disconnected ? null : payload.stream ?? vehicle.stream,
+    windKmh: disconnected ? null : payload.viento_velocidad_kmh ?? vehicle.windKmh,
+    windDeg: disconnected ? null : payload.viento_direccion_deg ?? vehicle.windDeg,
+    satellites: disconnected ? null : payload.satelites_gps ?? vehicle.satellites,
+    gpsFix: disconnected ? null : payload.gps_fix_type ?? vehicle.gpsFix,
+    tiltDeg: disconnected ? null : payload.tilt_grados ?? vehicle.tiltDeg,
+    signalPct: disconnected ? null : payload.senal_rf_porcentaje ?? vehicle.signalPct,
+    latencyMs: disconnected ? null : payload.latencia_ms ?? vehicle.latencyMs,
+    zonaActual: disconnected ? null : payload.zona_actual ?? vehicle.zonaActual,
+    estadoZona: disconnected ? null : payload.estado_zona ?? vehicle.estadoZona,
+    failsafeGcs: disconnected ? null : payload.failsafe_gcs_activo ?? vehicle.failsafeGcs,
+    paused: disconnected ? false : payload.pausado ?? vehicle.paused,
   }
 
-  linkState.backendReachable = true
+  linkState.backendReachable = source !== 'offline'
   linkState.droneConnected = Boolean(vehicle.connected)
   linkState.lastUpdate = new Date().toISOString()
   if (source === 'ws') linkState.transport = 'ws'
@@ -377,8 +434,7 @@ function mergeSnapshot(payload, source) {
 function markBackendUnreachable() {
   linkState.backendReachable = false
   linkState.droneConnected = false
-  vehicle.connected = false
-  rebuildTelemetry()
+  mergeSnapshot({ connected: false }, 'offline')
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +465,8 @@ function scheduleWsReconnect() {
 }
 
 function openTelemetrySocket(socketUrl) {
-  const url = socketUrl || buildWsUrl('/video/ws/telemetry')
+  const token = getAuthToken()
+  const url = socketUrl || buildWsUrl('/video/ws/telemetry', token ? { token } : {})
   let socket
   try {
     socket = new WebSocket(url)
@@ -492,7 +549,7 @@ async function pollRestTelemetry() {
 async function pollActiveMission() {
   if (!getAuthToken()) return
   try {
-    activeMission = await getActiveMission()
+    activeMission = await getRelevantMission()
     rebuildTelemetry()
   } catch (error) {
     if (error instanceof ApiError && error.isOffline) {
@@ -504,13 +561,45 @@ async function pollActiveMission() {
 async function pollChargingBase() {
   if (!getAuthToken()) return
   try {
-    chargingBase = await apiClient.get('/drone/charging-base')
+    if (chargingBases.length === 0) {
+      chargingBases = await apiClient.get('/drone/charging-bases')
+      if (!chargingBases.some((station) => station.station_id === activeStationId)) {
+        activeStationId = chargingBases[0]?.station_id || null
+      }
+    }
+    chargingBase = await apiClient.get('/drone/charging-base', {
+      query: activeStationId ? { station_id: activeStationId } : {},
+    })
     rebuildTelemetry()
   } catch (error) {
     if (error instanceof ApiError && error.isOffline) {
       markBackendUnreachable()
     }
   }
+}
+
+/** Devuelve las estaciones de carga conocidas para el selector de helipuerto. */
+export function getChargingBases() {
+  return [...chargingBases]
+}
+
+/**
+ * Selecciona la estación activa usada por HeliportCard y "Volver a Base".
+ * `stationId` debe ser el identificador real: helipuerto_norte o helipuerto_sur.
+ */
+export async function selectChargingBase(stationId) {
+  if (!stationId) throw new Error('Selecciona una estación de carga válida.')
+  if (chargingBases.length === 0) {
+    chargingBases = await apiClient.get('/drone/charging-bases')
+  }
+  const station = chargingBases.find((item) => item.station_id === stationId)
+  if (!station) throw new Error(`Estación de carga desconocida: ${stationId}`)
+  activeStationId = station.station_id
+  chargingBase = await apiClient.get('/drone/charging-base', {
+    query: { station_id: activeStationId },
+  })
+  rebuildTelemetry()
+  return chargingBase
 }
 
 /**
@@ -598,6 +687,8 @@ const telemetryService = {
   subscribeTelemetry,
   updateTelemetryData,
   updateSignalPercentage,
+  getChargingBases,
+  selectChargingBase,
   startTelemetry,
   stopTelemetry,
   refreshTelemetry,
