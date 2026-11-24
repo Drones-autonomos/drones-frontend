@@ -574,10 +574,13 @@
 }
 
 .telemetry-card__detail {
+  max-width: 100%;
+  overflow: hidden;
   margin-top: 3px;
   color: #626873;
   font-size: 18px;
   line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -692,6 +695,20 @@
 .drone-action--emergency .drone-action__icon svg {
   width: 29px;
   height: 29px;
+}
+
+.drone-action--mission {
+  border-color: #bfe8c9;
+}
+
+.drone-action--mission .drone-action__icon {
+  color: #0a7d2c;
+  background: #d9f5e0;
+}
+
+.drone-action:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .drone-action-message {
@@ -844,6 +861,8 @@
 
   .live-header__brand-copy > span {
     gap: 6px;
+    row-gap: 2px;
+    flex-wrap: wrap;
     font-size: clamp(13px, 3.4vw, 17px);
   }
 
@@ -870,7 +889,7 @@
 
   .live-content {
     gap: 20px;
-    padding: 20px 20px 72px;
+    padding: 20px 20px 96px;
   }
 
   .flight-card {
@@ -1020,6 +1039,7 @@
   }
 
   .telemetry-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
