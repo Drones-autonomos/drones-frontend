@@ -96,20 +96,17 @@
     padding-left: 236px;
   }
 
-  /* Shells: de columna móvil a ancho de consola */
+  /* Shells: de columna móvil a ancho completo tras el sidebar.
+     Sin tope fijo — el ancho disponible se aprovecha siempre;
+     el respiro lateral lo da el padding interno de cada página. */
   body .rutas-shell,
   body .bitacora-shell,
-  body .programar-ruta-shell {
-    width: min(100%, 1180px);
-  }
-
+  body .programar-ruta-shell,
   body .alertas-shell,
-  body .alertas-guardia-shell {
-    width: min(100%, 1180px);
-  }
-
+  body .alertas-guardia-shell,
   body .ajustes-shell {
-    width: min(100%, 1180px);
+    width: 100%;
+    max-width: none;
   }
 
   /* ------------------------------------------------------------------
@@ -274,7 +271,8 @@
   body .alertas-shell,
   body .alertas-guardia-shell,
   body .ajustes-shell {
-    width: min(100%, 720px);
+    width: 100%;
+    max-width: none;
   }
 
   body .campus-map-box {
@@ -290,21 +288,6 @@
    ESCRITORIO AMPLIO (≥1600px): aprovechar pantallas grandes/ultrawide
    ========================================================================== */
 @media (min-width: 1600px) {
-  body .rutas-shell,
-  body .bitacora-shell,
-  body .programar-ruta-shell {
-    width: min(calc(100% - 48px), 1700px);
-  }
-
-  body .alertas-shell,
-  body .alertas-guardia-shell {
-    width: min(calc(100% - 48px), 1500px);
-  }
-
-  body .ajustes-shell {
-    width: min(calc(100% - 48px), 1400px);
-  }
-
   body .campus-map-box {
     height: 560px;
   }
