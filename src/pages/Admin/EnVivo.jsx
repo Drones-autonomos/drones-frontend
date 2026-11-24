@@ -18,7 +18,7 @@ import {
   WindIcon,
 } from '../../components/EnVivoIcons.jsx'
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
-import useWebRTCStream from '../../hooks/useWebRTCStream.js'
+import useLiveVideoStream from '../../hooks/useLiveVideoStream.js'
 import {
   requestEmergencyStop,
   requestPauseFlight,
@@ -64,41 +64,6 @@ function TelemetryCard({ item }) {
         {item.detail}
       </span>
     </article>
-  )
-}
-
-function DroneActionButton({ action, Icon, children, variant = '' }) {
-  const [message, setMessage] = useState('')
-
-  async function handleAction() {
-    try {
-      setMessage('')
-      await action()
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'No se pudo enviar el comando al dron.',
-      )
-    }
-  }
-
-  return (
-    <>
-      <button
-        className={`drone-action${variant ? ` drone-action--${variant}` : ''}`}
-        type="button"
-        onClick={handleAction}
-      >
-        <span className="drone-action__icon">
-          <Icon />
-        </span>
-        <span>{children}</span>
-      </button>
-      {message && (
-        <p className="drone-action-message" role="status">
-          {message}
-        </p>
-      )}
-    </>
   )
 }
 
@@ -179,7 +144,7 @@ function HeliportCard({ heliport }) {
 
 function EnVivo() {
   const { drone, flight, preview, cards, quickActions, heliport } = useDroneTelemetry()
-  const { stream, isLive, connectionState } = useWebRTCStream()
+  const { streamUrl, isLive, connectionState, info: streamInfo } = useLiveVideoStream()
 
   const [isPaused, setIsPaused] = useState(Boolean(flight.isPaused))
   const [actionMessage, setActionMessage] = useState('')
@@ -256,12 +221,17 @@ function EnVivo() {
       <main className="live-content">
         <FlightCard flight={flight} />
 
-        {/* Reproductor WebRTC Reutilizable */}
+        {/* Reproductor de video en vivo (MJPEG del backend) */}
         <DroneVideoPlayer
-          stream={stream}
+          streamUrl={streamUrl}
           isLive={isLive}
           connectionState={connectionState}
-          preview={preview}
+          preview={{
+            ...preview,
+            resolution: streamInfo
+              ? `${streamInfo.resolucion} ${streamInfo.fps}fps`
+              : preview.resolution,
+          }}
         />
 
         {/* Cuatro tarjetas de telemetría */}

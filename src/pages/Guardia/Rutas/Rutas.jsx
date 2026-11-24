@@ -24,37 +24,37 @@ import {
   initialPreflightData,
   getStoredAutonomous,
   saveAutonomous,
-  getStoredMissions,
   getStoredGeofences,
   saveGeofences,
   validateRouteAgainstGeofences,
 } from '../../Admin/rutasData.js'
 import useDroneTelemetry from '../../../hooks/useDroneTelemetry.js'
-import { droneControlService } from '../../../services/droneControlService.js'
+import {
+  listMissions,
+  startMission,
+  cancelMission,
+  MISSIONS_UPDATED_EVENT,
+} from '../../../services/missionService.js'
+import {
+  syncGeofences,
+  createGeofence,
+  toggleBackendGeofence,
+  deleteBackendGeofence,
+} from '../../../services/geofenceService.js'
 import './Rutas.css'
 
 export default function GuardiaRutas() {
   const navigate = useNavigate()
   const telemetry = useDroneTelemetry()
 
-  // 1. Estado de comunicación y señal del dron (conectado con telemetría dinámica)
-  const [droneComm, setDroneComm] = useState(() => ({
+  // 1. Estado de comunicación del dron derivado de la telemetría real
+  const droneLink = telemetry?.link || {}
+  const droneComm = {
     ...initialDroneCommState,
-    signalQuality: telemetry?.drone?.signalPercentage ?? initialDroneCommState.signalQuality,
-  }))
-
-  // Sincronizar porcentaje de señal cuando cambie la telemetría real del dron
-  useEffect(() => {
-    if (telemetry?.drone?.signalPercentage !== undefined) {
-      setDroneComm((prev) => {
-        if (prev.signalQuality === telemetry.drone.signalPercentage) return prev
-        return {
-          ...prev,
-          signalQuality: telemetry.drone.signalPercentage,
-        }
-      })
-    }
-  }, [telemetry?.drone?.signalPercentage])
+    isConnected: Boolean(droneLink.droneConnected),
+    signalQuality: telemetry?.drone?.signalPercentage ?? 0,
+    status: droneLink.droneConnected ? 'online' : 'disconnected',
+  }
 
   // 2. Estado del interruptor de Vuelo Autónomo Activo (sincronizado con Admin)
   const [autonomousEnabled, setAutonomousEnabled] = useState(getStoredAutonomous)
@@ -62,14 +62,37 @@ export default function GuardiaRutas() {
   // 3. Geocercas registradas compartidas con Admin
   const [geofences, setGeofences] = useState(getStoredGeofences)
 
-  // 4. Misiones / Rutas programadas compartidas con Admin
-  const [missions, setMissions] = useState(getStoredMissions)
+  // 4. Misiones / Rutas programadas desde el backend
+  const [missions, setMissions] = useState([])
+  const [missionsError, setMissionsError] = useState(null)
+  const [isLoadingMissions, setIsLoadingMissions] = useState(true)
+  const [pendingActionId, setPendingActionId] = useState(null)
 
-  // Sincronización en tiempo real entre Admin y Guardia
+  async function loadMissions({ silent = false } = {}) {
+    if (!silent) setIsLoadingMissions(true)
+    try {
+      const list = await listMissions({ limit: 100 })
+      setMissions(list)
+      setMissionsError(null)
+    } catch (error) {
+      setMissionsError(
+        error instanceof Error ? error.message : 'No se pudieron cargar las misiones del backend.',
+      )
+    } finally {
+      if (!silent) setIsLoadingMissions(false)
+    }
+  }
+
+  // Cargar misiones del backend al montar y sincronizar ante cambios
   useEffect(() => {
+    // Deferido a la siguiente tarea para no setear estado de forma síncrona en el efecto
+    const initialTimer = window.setTimeout(() => {
+      loadMissions()
+      syncGeofences()
+    }, 0)
+
     function syncSharedData() {
-      const storedMissions = getStoredMissions()
-      setMissions((prev) => (JSON.stringify(prev) === JSON.stringify(storedMissions) ? prev : storedMissions))
+      loadMissions({ silent: true })
 
       const storedGeo = getStoredGeofences()
       setGeofences((prev) => (JSON.stringify(prev) === JSON.stringify(storedGeo) ? prev : storedGeo))
@@ -79,33 +102,46 @@ export default function GuardiaRutas() {
     }
 
     window.addEventListener('storage', syncSharedData)
-    window.addEventListener('aeroluferan_missions_updated', syncSharedData)
+    window.addEventListener(MISSIONS_UPDATED_EVENT, syncSharedData)
     window.addEventListener('aeroluferan_geofences_updated', syncSharedData)
     window.addEventListener('aeroluferan_autonomous_updated', syncSharedData)
+    const intervalId = window.setInterval(() => loadMissions({ silent: true }), 20000)
 
     return () => {
+      window.clearTimeout(initialTimer)
       window.removeEventListener('storage', syncSharedData)
-      window.removeEventListener('aeroluferan_missions_updated', syncSharedData)
+      window.removeEventListener(MISSIONS_UPDATED_EVENT, syncSharedData)
       window.removeEventListener('aeroluferan_geofences_updated', syncSharedData)
       window.removeEventListener('aeroluferan_autonomous_updated', syncSharedData)
+      window.clearInterval(intervalId)
     }
   }, [])
 
-  // Alternar estado de conexión del dron para pruebas operativas
-  function handleToggleCommStatus() {
-    setDroneComm((prev) => ({
-      ...prev,
-      isConnected: !prev.isConnected,
-      signalQuality: !prev.isConnected ? (telemetry?.drone?.signalPercentage || 98) : 0,
-      status: !prev.isConnected ? 'online' : 'disconnected',
-    }))
+  // Ruta seleccionada actualmente para visualización
+  const [selectedMissionId, setSelectedMissionId] = useState(null)
+
+  // 5. Verificación de prevuelo (batería y enlace reales desde telemetría)
+  const telemetryCards = telemetry?.cards || []
+  const batteryCard = telemetryCards.find((c) => c.id === 'battery')
+  const droneConnected = Boolean(droneLink.droneConnected)
+  const preflight = {
+    ...initialPreflightData,
+    overallStatus: droneConnected ? 'Todo Listo' : 'Sin enlace',
+    isReady: droneConnected,
+    metrics: {
+      wind: { ...initialPreflightData.metrics.wind, value: '—', statusLabel: 'Sin datos', statusType: 'success' },
+      battery: {
+        ...initialPreflightData.metrics.battery,
+        value: batteryCard?.value ?? '—',
+        statusLabel: droneConnected ? 'Telemetría real' : 'Sin datos',
+      },
+      rfSignal: {
+        ...initialPreflightData.metrics.rfSignal,
+        value: droneConnected ? `${droneComm.signalQuality}%` : 'Sin enlace',
+        statusLabel: droneConnected ? 'En línea' : 'Desconectado',
+      },
+    },
   }
-
-  // Ruta seleccionada actualmente para visualización e inicio
-  const [selectedMissionId, setSelectedMissionId] = useState(() => getStoredMissions()[0]?.id || '')
-
-  // 5. Verificación de prevuelo
-  const [preflight] = useState(initialPreflightData)
 
   // 6. Estados de modales y herramientas del mapa
   const [isGeofenceManagerOpen, setIsGeofenceManagerOpen] = useState(false)
@@ -133,11 +169,29 @@ export default function GuardiaRutas() {
     })
   }
 
-  // Manejo del botón "Iniciar Vuelo" para el perfil Guardia
+  // Manejo del botón "Iniciar Vuelo" / "Monitorear En Vivo" para el perfil Guardia.
+  // Nota de roles: iniciar misión requiere ADMIN; el backend responde 403 a GUARDIA.
   async function handleIniciarVuelo() {
     setFlightStatusMessage(null)
+    if (!selectedMission) return
 
-    // Comprobación 1: Señal y conexión del dron
+    // Misión ya en ejecución: ir directo a monitoreo
+    if (selectedMission.estado === 'EN_CURSO') {
+      navigate('/guardia/en-vivo', {
+        state: { missionId: selectedMission.id, missionName: selectedMission.name },
+      })
+      return
+    }
+
+    if (selectedMission.estado !== 'PROGRAMADA') {
+      setFlightStatusMessage({
+        type: 'error',
+        text: `La misión "${selectedMission.name}" está en estado ${selectedMission.estado} y no puede iniciarse.`,
+      })
+      return
+    }
+
+    // Comprobación 1: Señal y conexión del dron (telemetría real)
     if (!droneComm.isConnected) {
       setFlightStatusMessage({
         type: 'error',
@@ -146,16 +200,7 @@ export default function GuardiaRutas() {
       return
     }
 
-    // Comprobación 2: Verificación de prevuelo
-    if (!preflight.isReady) {
-      setFlightStatusMessage({
-        type: 'error',
-        text: 'No se puede iniciar el vuelo: la verificación de prevuelo reporta parámetros fuera de rango.',
-      })
-      return
-    }
-
-    // Comprobación 3: Restricciones de seguridad y geocercas
+    // Comprobación 2: Restricciones de seguridad y geocercas
     if (routeValidation.hasCriticalConflict) {
       const criticalZone = routeValidation.conflicts.find((c) => c.isRestricted)
       setFlightStatusMessage({
@@ -165,49 +210,79 @@ export default function GuardiaRutas() {
       return
     }
 
-    // Preparar despacho de vuelo a través del servicio de control de vuelo
     try {
-      if (droneControlService.checkConnection()) {
-        await droneControlService.resumeFlight()
-      }
-    } catch {
-      // Integración preparada
-    }
-
-    // Actualizar telemetría compartida con la misión que despega
-    telemetry.updateTelemetry({
-      flight: {
-        route: selectedMission.name,
-        milestone: 1,
-        totalMilestones: selectedMission.waypoints ? selectedMission.waypoints.length : 12,
-        mode: autonomousEnabled ? 'Vuelo Autónomo' : 'Control Manual',
-        isPaused: false,
-      },
-      drone: {
-        patrolStatus: 'En Patrullaje',
-      },
-    })
-
-    // Autorización concedida y redirección automática a En Vivo de Guardia
-    setFlightStatusMessage({
-      type: 'success',
-      text: `Misión "${selectedMission.name}" autorizada por Guardia. Redirigiendo a monitoreo En Vivo...`,
-    })
-
-    setTimeout(() => {
-      navigate('/guardia/en-vivo', {
-        state: {
-          missionId: selectedMission.id,
-          missionName: selectedMission.name,
-          droneId: droneComm.model,
-          isAutonomous: autonomousEnabled,
-        },
+      setPendingActionId(selectedMission.id)
+      const started = await startMission(selectedMission.id)
+      setFlightStatusMessage({
+        type: 'success',
+        text: `Misión "${started.name}" en ejecución. Redirigiendo a monitoreo En Vivo...`,
       })
-    }, 1200)
+      setTimeout(() => {
+        navigate('/guardia/en-vivo', {
+          state: {
+            missionId: started.id,
+            missionName: started.name,
+            droneId: droneComm.model,
+            isAutonomous: autonomousEnabled,
+          },
+        })
+      }, 1200)
+    } catch (error) {
+      setFlightStatusMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo iniciar la misión en el backend.',
+      })
+    } finally {
+      setPendingActionId(null)
+    }
   }
 
-  // Manejadores de geocercas sincronizados
-  function handleToggleZoneStatus(zoneId) {
+  // Cancelación de misión (permitido para GUARDIA: PROGRAMADA → CANCELADA; EN_CURSO → RTL)
+  async function handleCancelMission(mission, event) {
+    event?.stopPropagation?.()
+    setFlightStatusMessage(null)
+    try {
+      setPendingActionId(mission.id)
+      const cancelled = await cancelMission(mission.id)
+      setFlightStatusMessage({
+        type: 'success',
+        text: `Misión "${cancelled.name}" ${cancelled.estado === 'CANCELANDO' ? 'en cancelación (RTL)' : 'cancelada'} correctamente.`,
+      })
+      await loadMissions({ silent: true })
+    } catch (error) {
+      setFlightStatusMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo cancelar la misión.',
+      })
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
+  // Manejadores de geocercas sincronizados.
+  // Nota de roles: crear/activar/eliminar geocercas del backend es solo ADMIN;
+  // para GUARDIA el servidor responde 403 y se muestra el mensaje al operador.
+  async function handleToggleZoneStatus(zoneId) {
+    const zone = geofences.find((z) => z.id === zoneId)
+    if (zone?.backendId) {
+      try {
+        const updatedZone = await toggleBackendGeofence(zone.backendId)
+        setGeofences((prev) => {
+          const updated = prev.map((z) => (z.id === zoneId ? { ...updatedZone } : z))
+          saveGeofences(updated)
+          return updated
+        })
+      } catch (error) {
+        setFlightStatusMessage({
+          type: 'error',
+          text:
+            error?.status === 403
+              ? 'Cambiar el estado de las geocercas operativas requiere perfil Administrador.'
+              : 'No se pudo actualizar la geocerca en el servidor.',
+        })
+      }
+      return
+    }
     setGeofences((prev) => {
       const updated = prev.map((z) =>
         z.id === zoneId ? { ...z, status: z.status === 'Activa' ? 'Inactiva' : 'Activa' } : z,
@@ -217,7 +292,22 @@ export default function GuardiaRutas() {
     })
   }
 
-  function handleDeleteZone(zoneId) {
+  async function handleDeleteZone(zoneId) {
+    const zone = geofences.find((z) => z.id === zoneId)
+    if (zone?.backendId) {
+      try {
+        await deleteBackendGeofence(zone.backendId)
+      } catch (error) {
+        setFlightStatusMessage({
+          type: 'error',
+          text:
+            error?.status === 403
+              ? 'Eliminar geocercas operativas requiere perfil Administrador.'
+              : 'No se pudo eliminar la geocerca en el servidor.',
+        })
+        return
+      }
+    }
     setGeofences((prev) => {
       const updated = prev.filter((z) => z.id !== zoneId)
       saveGeofences(updated)
@@ -226,6 +316,8 @@ export default function GuardiaRutas() {
   }
 
   function handleEditZone(zoneId, updatedFields) {
+    // El backend no expone edición de geocercas; los cambios de nombre/motivo
+    // se conservan en la capa local de presentación.
     setGeofences((prev) => {
       const updated = prev.map((z) => (z.id === zoneId ? { ...z, ...updatedFields } : z))
       saveGeofences(updated)
@@ -238,11 +330,38 @@ export default function GuardiaRutas() {
     setPendingZoneBounds(bounds)
   }
 
-  function handleSaveNewZone(zoneData) {
-    const newZone = {
+  async function handleSaveNewZone(zoneData) {
+    const baseZone = {
       id: `geo-${Date.now()}`,
       ...zoneData,
     }
+
+    if (zoneData.type === 'informativa') {
+      try {
+        const created = await createGeofence(baseZone)
+        setGeofences((prev) => {
+          const updated = [...prev, created]
+          saveGeofences(updated)
+          return updated
+        })
+        setPendingZoneBounds(null)
+        setFlightStatusMessage({
+          type: 'success',
+          text: `Geocerca operativa "${created.name}" registrada en el servidor.`,
+        })
+        return
+      } catch (error) {
+        setFlightStatusMessage({
+          type: 'error',
+          text:
+            error?.status === 403
+              ? 'Registrar geocercas operativas requiere perfil Administrador. La zona se conservó solo en esta sesión.'
+              : 'Sin conexión con el backend: la zona se conservó solo en esta sesión.',
+        })
+      }
+    }
+
+    const newZone = { ...baseZone, source: 'local' }
     setGeofences((prev) => {
       const updated = [...prev, newZone]
       saveGeofences(updated)
@@ -277,13 +396,7 @@ export default function GuardiaRutas() {
 
           <div
             className={`drone-signal-badge${!droneComm.isConnected ? ' is-disconnected' : ''}`}
-            onClick={handleToggleCommStatus}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') handleToggleCommStatus()
-            }}
-            title={`Calidad del enlace RF: ${droneComm.signalQuality}% · Estado: ${droneComm.isConnected ? 'Conectado (Clic para simular desconexión)' : 'Desconectado (Clic para reconectar)'}`}
+            title={`Calidad del enlace RF: ${droneComm.signalQuality}% · Estado: ${droneComm.isConnected ? 'Dron conectado' : 'Sin conexión con el dron'}`}
           >
             <SignalWifiIcon size={16} color={droneComm.isConnected ? '#10B981' : '#EF4444'} />
             <span>{droneComm.isConnected ? `${droneComm.signalQuality}%` : 'Sin Señal'}</span>
@@ -417,8 +530,19 @@ export default function GuardiaRutas() {
             type="button"
             className="btn-iniciar-vuelo"
             onClick={handleIniciarVuelo}
+            disabled={
+              !selectedMission ||
+              pendingActionId !== null ||
+              !['PROGRAMADA', 'EN_CURSO'].includes(selectedMission.estado)
+            }
           >
-            Iniciar Vuelo
+            {!selectedMission
+              ? 'Sin misión seleccionada'
+              : selectedMission.estado === 'EN_CURSO'
+                ? 'Monitorear En Vivo'
+                : selectedMission.estado === 'PROGRAMADA'
+                  ? pendingActionId === selectedMission.id ? 'Iniciando…' : 'Iniciar Vuelo'
+                  : `Misión ${selectedMission.statusBadge || selectedMission.estado}`}
           </button>
 
           {/* ============================================================== */}
@@ -430,13 +554,29 @@ export default function GuardiaRutas() {
             <div className="vuelos-programados-header">
               <h2 id="guard-vuelos-heading">Vuelos Programados</h2>
               <span className="vuelos-count">
-                {missions.length} de {missions.length} Rutas
+                {missions.length} {missions.length === 1 ? 'Ruta' : 'Rutas'}
               </span>
             </div>
 
+            {missionsError && (
+              <div className="missions-offline-banner" role="alert">
+                ⚠️ Sin conexión con el backend: {missionsError}
+              </div>
+            )}
+
+            {!missionsError && isLoadingMissions && (
+              <p className="missions-empty-note">Cargando misiones…</p>
+            )}
+
+            {!missionsError && !isLoadingMissions && missions.length === 0 && (
+              <p className="missions-empty-note">
+                No hay misiones registradas en el sistema.
+              </p>
+            )}
+
             <div className="vuelos-cards-list">
               {missions.map((mission) => {
-                const isSelected = mission.id === selectedMission.id
+                const isSelected = selectedMission && mission.id === selectedMission.id
 
                 return (
                   <article
@@ -472,11 +612,24 @@ export default function GuardiaRutas() {
                         </div>
                       </div>
 
-                      <span
-                        className={`vuelo-status-tag vuelo-status-tag--${mission.statusType || 'proximo'}`}
-                      >
-                        {mission.statusBadge || mission.status.toUpperCase()}
-                      </span>
+                      <div className="vuelo-card-side">
+                        <span
+                          className={`vuelo-status-tag vuelo-status-tag--${mission.statusType || 'proximo'}`}
+                        >
+                          {mission.statusBadge || mission.status.toUpperCase()}
+                        </span>
+                        {['PROGRAMADA', 'EN_CURSO'].includes(mission.estado) && (
+                          <button
+                            type="button"
+                            className="vuelo-cancel-btn"
+                            disabled={pendingActionId === mission.id}
+                            onClick={(e) => handleCancelMission(mission, e)}
+                            title={mission.estado === 'EN_CURSO' ? 'Cancelar ejecución (RTL)' : 'Cancelar misión'}
+                          >
+                            {pendingActionId === mission.id ? '…' : 'Cancelar'}
+                          </button>
+                        )}
+                      </div>
                     </header>
 
                     <div className="vuelo-metrics-grid">

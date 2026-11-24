@@ -18,7 +18,7 @@ import {
   WindIcon,
 } from '../../../components/EnVivoIcons.jsx'
 import useDroneTelemetry from '../../../hooks/useDroneTelemetry.js'
-import useWebRTCStream from '../../../hooks/useWebRTCStream.js'
+import useLiveVideoStream from '../../../hooks/useLiveVideoStream.js'
 import { droneControlService } from '../../../services/droneControlService.js'
 import './EnVivo.css'
 
@@ -146,7 +146,7 @@ function HeliportCard({ heliport }) {
 
 function GuardiaEnVivo() {
   const { drone, flight, preview, cards, quickActions, heliport } = useDroneTelemetry()
-  const { stream, isLive, connectionState } = useWebRTCStream()
+  const { streamUrl, isLive, connectionState, info: streamInfo } = useLiveVideoStream()
 
   const [isPaused, setIsPaused] = useState(Boolean(flight.isPaused))
   const [actionMessage, setActionMessage] = useState('')
@@ -224,12 +224,17 @@ function GuardiaEnVivo() {
         {/* 2.2 Vuelo Activo */}
         <FlightCard flight={flight} />
 
-        {/* 2.3 Vista Previa del Dron en Vivo - WebRTC */}
+        {/* 2.3 Vista Previa del Dron en Vivo - MJPEG del backend */}
         <DroneVideoPlayer
-          stream={stream}
+          streamUrl={streamUrl}
           isLive={isLive}
           connectionState={connectionState}
-          preview={preview}
+          preview={{
+            ...preview,
+            resolution: streamInfo
+              ? `${streamInfo.resolucion} ${streamInfo.fps}fps`
+              : preview.resolution,
+          }}
         />
 
         {/* 2.4 Datos de Telemetría (4 tarjetas) */}

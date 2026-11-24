@@ -1,8 +1,14 @@
 /**
  * Servicio de Asistencia de Video y Descarga para la Bitácora de AeroLuferan.
- * Proporciona generación de streams de video de demostración para el reproductor HTML5
- * y maneja la descarga de grabaciones respetando el periodo de retención de 30 días.
+ * Cuando el vuelo tiene una grabación real en el backend (`video.recordingId`),
+ * reproduce/descarga el MP4 descifrado vía /recordings/{id}/stream|download.
+ * En su defecto, conserva la generación de streams de demostración locales.
  */
+
+import {
+  downloadRecordingFile,
+  getRecordingPlaybackUrl,
+} from '../../services/flightLogService.js'
 
 // Cache de blobs generados por identificador de vuelo para rendimiento óptimo
 const videoBlobCache = new Map()
@@ -12,6 +18,16 @@ const videoBlobCache = new Map()
  * con HUD de telemetría superpuesto en tiempo real.
  */
 export async function getOrCreateFlightVideoUrl(flight) {
+  // Grabación real almacenada en el backend (cifrada en reposo, descifrada al servirla)
+  if (flight?.video?.recordingId) {
+    try {
+      return await getRecordingPlaybackUrl(flight)
+    } catch (error) {
+      console.warn('No se pudo obtener la grabación del backend:', error?.message)
+      return null
+    }
+  }
+
   // Si el vuelo ya cuenta con una URL externa proporcionada por el backend, utilizarla
   if (flight.videoUrl && flight.videoUrl.trim() !== '') {
     return flight.videoUrl
@@ -159,6 +175,11 @@ export async function getOrCreateFlightVideoUrl(flight) {
  * Descarga el archivo de video de la grabación seleccionada
  */
 export async function downloadFlightRecording(flight, retentionStatus) {
+  // Grabación real en el backend: descarga autenticada (solo ADMIN según la API)
+  if (flight?.video?.recordingId) {
+    return await downloadRecordingFile(flight)
+  }
+
   // Verificación de expiración (Regla 14)
   if (retentionStatus.isExpired) {
     return {

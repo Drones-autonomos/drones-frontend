@@ -23,6 +23,7 @@ import {
   saveSettings,
   TRANSMISSION_QUALITY_OPTIONS,
 } from '../Admin/ajustesData.js'
+import { fetchOperatingWindow } from '../../services/settingsService.js'
 import './Ajustes.css'
 
 /**
@@ -83,6 +84,20 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
   const [isHeliportModalOpen, setIsHeliportModalOpen] = useState(false)
   const [isNormativeModalOpen, setIsNormativeModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+
+  // 4. Ventana operativa normativa del backend (solo consulta para Guardia)
+  const [operatingWindow, setOperatingWindow] = useState(null)
+  const [isOperatingWindowModalOpen, setIsOperatingWindowModalOpen] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    fetchOperatingWindow().then((cfg) => {
+      if (isMounted && cfg) setOperatingWindow(cfg)
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Referencia al input de archivo para cambiar foto
   const fileInputRef = useRef(null)
@@ -554,6 +569,33 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                   <ExternalLinkIcon size={18} />
                 </button>
               </div>
+
+              {/* Ventana Operativa Autorizada (solo consulta; edición requiere ADMIN) */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                    <SlidersAdjustIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Ventana Operativa Autorizada</strong>
+                    <p className="ajustes-item__subtitle">
+                      {operatingWindow
+                        ? `${operatingWindow.hora_apertura} – ${operatingWindow.hora_cierre} hrs · Techo ${Math.round(operatingWindow.altitud_maxima_m)} m`
+                        : 'Sin conexión con el servidor'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-action-circle"
+                  onClick={() => setIsOperatingWindowModalOpen(true)}
+                  title="Consultar la ventana operativa normativa vigente"
+                  aria-label="Consultar ventana operativa"
+                >
+                  <ChevronRightIcon size={16} />
+                </button>
+              </div>
             </section>
 
             {/* F. BOTÓN CERRAR SESIÓN Y VERSIÓN */}
@@ -795,6 +837,61 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                 type="button"
                 className="btn-ajustes-modal-cancel"
                 onClick={() => setIsNormativeModalOpen(false)}
+                style={{ flex: 'none', width: '100%' }}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 6: Ventana Operativa Autorizada (solo consulta para Guardia) */}
+      {isOperatingWindowModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ow-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="ow-title">Ventana Operativa Autorizada</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsOperatingWindowModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              {operatingWindow ? (
+                <div className="modal-session-detail">
+                  <span>Horario autorizado de operación:</span>
+                  <strong>
+                    {operatingWindow.hora_apertura} – {operatingWindow.hora_cierre} hrs
+                  </strong>
+                  <span>Altitud operativa:</span>
+                  <strong>
+                    {Math.round(operatingWindow.altitud_minima_m)} –{' '}
+                    {Math.round(operatingWindow.altitud_maxima_m)} m AGL
+                  </strong>
+                  <span>Peso máximo de aeronave:</span>
+                  <strong>{operatingWindow.peso_maximo_kg} kg</strong>
+                  <small style={{ color: '#475569', marginTop: '4px' }}>
+                    Configuración vigente en el servidor. Su modificación requiere perfil
+                    Administrador.
+                  </small>
+                </div>
+              ) : (
+                <p>
+                  Sin conexión con el servidor backend. No es posible consultar la
+                  ventana operativa normativa en este momento.
+                </p>
+              )}
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsOperatingWindowModalOpen(false)}
                 style={{ flex: 'none', width: '100%' }}
               >
                 Entendido

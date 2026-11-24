@@ -21,12 +21,16 @@ import {
 import { getCurrentUser, logoutUser, updateUserProfile } from './authSession.js'
 import {
   AI_SENSITIVITY_OPTIONS,
-  generateAuditExportFile,
   getStoredSettings,
   RETENTION_PERIOD_OPTIONS,
   saveSettings,
   TRANSMISSION_QUALITY_OPTIONS,
 } from './ajustesData.js'
+import { generateAuditExportFile } from '../../services/flightLogService.js'
+import {
+  fetchOperatingWindow,
+  updateOperatingWindow,
+} from '../../services/settingsService.js'
 import './Ajustes.css'
 
 /**
@@ -72,6 +76,23 @@ export default function Ajustes({ initialView = 'main' }) {
   const [isHeliportModalOpen, setIsHeliportModalOpen] = useState(false)
   const [isNormativeModalOpen, setIsNormativeModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+
+  // 4. Ventana operativa normativa del backend (GET /settings/operating-window)
+  const [operatingWindow, setOperatingWindow] = useState(null)
+  const [isOperatingWindowModalOpen, setIsOperatingWindowModalOpen] = useState(false)
+  const [owForm, setOwForm] = useState(null)
+  const [owSaving, setOwSaving] = useState(false)
+  const [owError, setOwError] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+    fetchOperatingWindow().then((cfg) => {
+      if (isMounted && cfg) setOperatingWindow(cfg)
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Referencia al input de archivo para cambiar foto
   const fileInputRef = useRef(null)
@@ -140,10 +161,44 @@ export default function Ajustes({ initialView = 'main' }) {
     showToast(`Calidad de transmisión actualizada a ${opt?.label.split(' (')[0] || qualityId}.`)
   }
 
-  // Descarga del registro criptográfico de auditoría
-  function handleDownloadAudit() {
-    const { filename } = generateAuditExportFile()
-    showToast(`Descargando ${filename}`)
+  // Descarga del registro criptográfico de auditoría (datos reales del backend)
+  async function handleDownloadAudit() {
+    try {
+      const { filename } = await generateAuditExportFile()
+      showToast(`Descargando ${filename}`)
+    } catch {
+      showToast('No se pudo generar el registro de auditoría desde el servidor.')
+    }
+  }
+
+  // Ventana operativa: abrir modal de edición y guardar cambios (solo ADMIN)
+  function handleOpenOperatingWindow() {
+    setOwForm(operatingWindow ? { ...operatingWindow } : null)
+    setOwError(null)
+    setIsOperatingWindowModalOpen(true)
+  }
+
+  async function handleSaveOperatingWindow(e) {
+    e.preventDefault()
+    if (!owForm) return
+    setOwSaving(true)
+    setOwError(null)
+    try {
+      const updated = await updateOperatingWindow(owForm)
+      setOperatingWindow(updated)
+      setIsOperatingWindowModalOpen(false)
+      showToast(
+        `Ventana operativa actualizada: ${updated.hora_apertura} – ${updated.hora_cierre} hrs.`,
+      )
+    } catch (error) {
+      setOwError(
+        error?.status === 403
+          ? 'La modificación de la ventana operativa requiere perfil Administrador.'
+          : error?.message || 'No se pudo actualizar la configuración en el servidor.',
+      )
+    } finally {
+      setOwSaving(false)
+    }
   }
 
   // Confirmación de cierre de sesión
@@ -638,6 +693,33 @@ export default function Ajustes({ initialView = 'main' }) {
                   <ExternalLinkIcon size={18} />
                 </button>
               </div>
+
+              {/* Ventana Operativa Autorizada (configuración real del backend) */}
+              <div className="ajustes-item-row">
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                    <SlidersAdjustIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Ventana Operativa Autorizada</strong>
+                    <p className="ajustes-item__subtitle">
+                      {operatingWindow
+                        ? `${operatingWindow.hora_apertura} – ${operatingWindow.hora_cierre} hrs · Techo ${Math.round(operatingWindow.altitud_maxima_m)} m · Máx ${operatingWindow.peso_maximo_kg} kg`
+                        : 'Sin conexión con el servidor'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-action-circle"
+                  onClick={handleOpenOperatingWindow}
+                  title="Consultar y modificar la ventana operativa normativa"
+                  aria-label="Configurar ventana operativa"
+                >
+                  <ChevronRightIcon size={16} />
+                </button>
+              </div>
             </section>
 
             {/* F. BOTÓN CERRAR SESIÓN Y VERSIÓN */}
@@ -933,6 +1015,135 @@ export default function Ajustes({ initialView = 'main' }) {
                 Aceptar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 7: Ventana Operativa Autorizada (configuración normativa del backend) */}
+      {isOperatingWindowModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ow-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="ow-title">Ventana Operativa Autorizada</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsOperatingWindowModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            {owForm ? (
+              <form onSubmit={handleSaveOperatingWindow}>
+                <div className="ajustes-modal-body">
+                  <p>
+                    Configuración normativa vigente en el servidor. Aplica a misiones,
+                    despegues y validaciones de geocerca.
+                  </p>
+                  <div className="modal-options-list">
+                    <label className="form-label-block" style={{ display: 'block' }}>
+                      <span>Hora de apertura (HH:MM)</span>
+                      <input
+                        type="time"
+                        value={owForm.hora_apertura}
+                        onChange={(e) => setOwForm({ ...owForm, hora_apertura: e.target.value })}
+                        required
+                      />
+                    </label>
+                    <label className="form-label-block" style={{ display: 'block' }}>
+                      <span>Hora de cierre (HH:MM)</span>
+                      <input
+                        type="time"
+                        value={owForm.hora_cierre}
+                        onChange={(e) => setOwForm({ ...owForm, hora_cierre: e.target.value })}
+                        required
+                      />
+                    </label>
+                    <label className="form-label-block" style={{ display: 'block' }}>
+                      <span>Altitud mínima (1–50 m)</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        step="0.5"
+                        value={owForm.altitud_minima_m}
+                        onChange={(e) =>
+                          setOwForm({ ...owForm, altitud_minima_m: e.target.value })
+                        }
+                        required
+                      />
+                    </label>
+                    <label className="form-label-block" style={{ display: 'block' }}>
+                      <span>Altitud máxima / techo (2–200 m)</span>
+                      <input
+                        type="number"
+                        min="2"
+                        max="200"
+                        step="1"
+                        value={owForm.altitud_maxima_m}
+                        onChange={(e) =>
+                          setOwForm({ ...owForm, altitud_maxima_m: e.target.value })
+                        }
+                        required
+                      />
+                    </label>
+                    <label className="form-label-block" style={{ display: 'block' }}>
+                      <span>Peso máximo de aeronave (kg)</span>
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="25"
+                        step="0.1"
+                        value={owForm.peso_maximo_kg}
+                        onChange={(e) =>
+                          setOwForm({ ...owForm, peso_maximo_kg: e.target.value })
+                        }
+                        required
+                      />
+                    </label>
+                  </div>
+                  {owError && (
+                    <p style={{ fontSize: '12px', color: '#dc2626' }} role="alert">
+                      {owError}
+                    </p>
+                  )}
+                </div>
+                <div className="ajustes-modal-actions">
+                  <button
+                    type="button"
+                    className="btn-ajustes-modal-cancel"
+                    onClick={() => setIsOperatingWindowModalOpen(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-ajustes-modal-confirm"
+                    disabled={owSaving}
+                  >
+                    {owSaving ? 'Guardando…' : 'Guardar en servidor'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="ajustes-modal-body">
+                <p>
+                  Sin conexión con el servidor backend. No es posible consultar la
+                  ventana operativa normativa en este momento.
+                </p>
+                <div className="ajustes-modal-actions">
+                  <button
+                    type="button"
+                    className="btn-ajustes-modal-cancel"
+                    onClick={() => setIsOperatingWindowModalOpen(false)}
+                    style={{ width: '100%', flex: 'none' }}
+                  >
+                    Entendido
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

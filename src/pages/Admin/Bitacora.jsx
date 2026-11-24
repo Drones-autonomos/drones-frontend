@@ -14,7 +14,6 @@ import {
   CloseModalIcon,
   DistancePathIcon,
   DownloadTrayIcon,
-  FullscreenIcon,
   MountainAltitudeIcon,
   PlayCircleIcon,
   PlayFilledMiniIcon,
@@ -28,6 +27,7 @@ import {
 } from './bitacoraData.js'
 import { getCurrentUser, logoutUser } from './authSession.js'
 import { downloadFlightRecording, getOrCreateFlightVideoUrl } from './videoDemoHelper.js'
+import { refreshFlightLog } from '../../services/flightLogService.js'
 import './Bitacora.css'
 
 /**
@@ -281,7 +281,7 @@ function SwitchUserModal({ isOpen, onClose, onConfirm, currentUser }) {
  */
 function VideoModal({ flight, onClose, onDownload }) {
   const [videoUrl, setVideoUrl] = useState(flight?.video?.videoUrl || '')
-  const [isLoading, setIsLoading] = useState(true)
+  const [, setIsLoading] = useState(true)
   const videoPlayerRef = useRef(null)
 
   useEffect(() => {
@@ -480,6 +480,19 @@ function Bitacora() {
     }
     window.addEventListener('aeroluferan_bitacora_updated', syncFlights)
     return () => window.removeEventListener('aeroluferan_bitacora_updated', syncFlights)
+  }, [])
+
+  // Sincronizar con el backend (misiones + grabaciones + telemetría + eventos)
+  useEffect(() => {
+    let isMounted = true
+    refreshFlightLog().then((result) => {
+      if (isMounted && Array.isArray(result)) {
+        setFlights(getStoredFlights())
+      }
+    })
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   // 3. Estados de búsqueda y filtros

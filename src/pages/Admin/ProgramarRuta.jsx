@@ -18,9 +18,9 @@ import {
   calculatePathDistance,
   getStoredGeofences,
   initialChecklistData,
-  saveMission,
   validateRouteAgainstGeofences,
 } from './rutasData.js'
+import { createMission } from '../../services/missionService.js'
 import './ProgramarRuta.css'
 
 // Waypoints iniciales de demostración acordes al trayecto E2 -> A de la captura
@@ -78,6 +78,7 @@ export default function ProgramarRuta() {
   const [activeConfigModal, setActiveConfigModal] = useState(null) // 'despegue' | 'aterrizaje' | 'frecuencia' | null
   const [formError, setFormError] = useState(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Cálculo de distancia y duración de cobertura
   const pathDistance = useMemo(() => {
@@ -148,13 +149,13 @@ export default function ProgramarRuta() {
     )
   }
 
-  // Guardar y programar vuelo
-  function handleProgramarVuelo() {
+  // Guardar y programar vuelo en el backend
+  async function handleProgramarVuelo() {
     setFormError(null)
 
-    // 1. Validar nombre de la misión
-    if (!missionName.trim()) {
-      setFormError('Por favor ingresa un nombre para la misión.')
+    // 1. Validar nombre de la misión (backend exige 3–100 caracteres)
+    if (!missionName.trim() || missionName.trim().length < 3) {
+      setFormError('Por favor ingresa un nombre para la misión (mínimo 3 caracteres).')
       return
     }
 
@@ -179,42 +180,39 @@ export default function ProgramarRuta() {
       return
     }
 
-    // Construcción del registro de la misión compartida
-    const newMission = {
-      id: `m-${Date.now()}`,
-      name: missionName.trim(),
-      iconType: patrolClassification.includes('matutino') ? 'sun' : 'moon',
-      startTime: departureTime,
-      endTime: arrivalTime,
-      timeDisplay: `${departureTime} – ${arrivalTime} HRS`,
-      zone: departureHelipad.includes('Norte') ? 'Zona Norte' : 'Zona Central',
-      status: 'Agendado',
-      statusBadge: 'AGENDADO',
-      statusType: 'agendado',
-      duration: `${calculatedDurationMinutes} min`,
-      batteryRequired: `${Math.min(95, Math.max(25, Math.round(calculatedDurationMinutes * 1.3)))}% Batt`,
-      opticalSensor: patrolClassification.includes('matutino') ? 'RGB 4K + IR' : 'Térmica FLIR',
-      sensorColor: patrolClassification.includes('matutino') ? 'blue' : 'purple',
-      droneId: 'Vanguard-01',
-      departureHelipad,
-      arrivalHelipad,
-      frequency: frequencyDisplayText,
-      patrolType: patrolClassification,
-      operatingHeight,
-      date: departureDate,
-      waypoints,
-      distanceMeters: pathDistance,
-      exclusionEnabled,
+    // Descripción con metadatos de la planificación (el backend solo guarda
+    // nombre/descripcion/horario; la zona, frecuencia y duración viajan aquí)
+    const zone = departureHelipad.includes('Norte') ? 'Zona Norte' : 'Zona Central'
+    const descripcion = [
+      zone,
+      patrolClassification,
+      frequencyDisplayText,
+      `${departureHelipad} → ${arrivalHelipad}`,
+      `${calculatedDurationMinutes} min`,
+    ].join(' · ')
+
+    try {
+      setIsSaving(true)
+      await createMission({
+        nombre: missionName,
+        descripcion,
+        horarioInicio: `${departureDate}T${departureTime}:00`,
+        waypoints,
+        altitudMetros: operatingHeight,
+      })
+      setSaveSuccess(true)
+
+      // Regresar a la interfaz Rutas tras breve confirmación visual
+      setTimeout(() => {
+        navigate('/admin/rutas')
+      }, 900)
+    } catch (error) {
+      setFormError(
+        error instanceof Error ? error.message : 'No se pudo registrar la misión en el backend.',
+      )
+    } finally {
+      setIsSaving(false)
     }
-
-    // Guardar en la capa de persistencia compartida
-    saveMission(newMission)
-    setSaveSuccess(true)
-
-    // Regresar a la interfaz Rutas tras breve confirmación visual
-    setTimeout(() => {
-      navigate('/admin/rutas')
-    }, 900)
   }
 
   return (
@@ -492,8 +490,9 @@ export default function ProgramarRuta() {
             type="button"
             className="btn-programar-vuelo-primary"
             onClick={handleProgramarVuelo}
+            disabled={isSaving}
           >
-            Programar vuelo
+            {isSaving ? 'Guardando misión…' : 'Programar vuelo'}
           </button>
         </main>
 

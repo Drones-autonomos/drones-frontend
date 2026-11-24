@@ -26,6 +26,7 @@ import {
 } from '../Admin/bitacoraData.js'
 import { getCurrentUser, logoutUser } from '../Admin/authSession.js'
 import { getOrCreateFlightVideoUrl } from '../Admin/videoDemoHelper.js'
+import { refreshFlightLog } from '../../services/flightLogService.js'
 import './Bitacora.css'
 
 /**
@@ -451,6 +452,19 @@ export default function GuardiaBitacora() {
     }
     window.addEventListener('aeroluferan_bitacora_updated', syncFlights)
     return () => window.removeEventListener('aeroluferan_bitacora_updated', syncFlights)
+  }, [])
+
+  // Sincronizar con el backend (misiones + grabaciones + telemetría + eventos)
+  useEffect(() => {
+    let isMounted = true
+    refreshFlightLog().then((result) => {
+      if (isMounted && Array.isArray(result)) {
+        setFlights(getStoredFlights())
+      }
+    })
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   // 3. Estados de búsqueda y filtros

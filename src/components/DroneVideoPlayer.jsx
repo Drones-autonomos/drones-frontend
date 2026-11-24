@@ -9,6 +9,7 @@ import {
 
 export function DroneVideoPlayer({
   stream = null,
+  streamUrl = null,
   isLive = false,
   connectionState = 'idle',
   preview = {
@@ -73,7 +74,13 @@ export function DroneVideoPlayer({
         className={`live-preview${isFullscreen ? ' is-fullscreen' : ''}`}
         ref={containerRef}
       >
-        {isLive && stream ? (
+        {isLive && streamUrl ? (
+          <img
+            className="live-preview__video"
+            src={streamUrl}
+            alt="Transmisión en tiempo real del dron (MJPEG)"
+          />
+        ) : isLive && stream ? (
           <video
             ref={videoRef}
             className="live-preview__video"
@@ -100,7 +107,11 @@ export function DroneVideoPlayer({
           ) : (
             <span className="preview-live-indicator preview-live-indicator--pending">
               <span className="preview-live-dot preview-live-dot--pending" />
-              {connectionState === 'connecting' ? 'CONECTANDO...' : 'VISTA PREVIA'}
+              {connectionState === 'connecting'
+                ? 'CONECTANDO...'
+                : connectionState === 'disconnected'
+                  ? 'SIN SEÑAL DE VIDEO'
+                  : 'VISTA PREVIA'}
             </span>
           )}
 
@@ -114,7 +125,7 @@ export function DroneVideoPlayer({
         {/* Aviso de vista de referencia cuando no hay transmisión activa */}
         {!isLive && (
           <span className="preview-demo-note" role="status">
-            VISTA DE REFERENCIA · CONEXIÓN WEBRTC PENDIENTE
+            VISTA DE REFERENCIA · STREAM DE VIDEO NO DISPONIBLE
           </span>
         )}
 
