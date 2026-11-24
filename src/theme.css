@@ -393,6 +393,77 @@
   color: var(--dark-text);
 }
 
+/* --- Botones de acción y controles neutros restantes --- */
+[data-theme='dark'] .drone-action,
+[data-theme='dark'] .btn-action-circle,
+[data-theme='dark'] .btn-cancel-sm,
+[data-theme='dark'] .btn-day-pill,
+[data-theme='dark'] .btn-freq-opt,
+[data-theme='dark'] .btn-normative-link,
+[data-theme='dark'] .modal-option-btn,
+[data-theme='dark'] .preset-route-btn,
+[data-theme='dark'] .prevuelo-mini-card,
+[data-theme='dark'] .profile-chevron-btn,
+[data-theme='dark'] .patrol-type-preview,
+[data-theme='dark'] .telemetry-bar,
+[data-theme='dark'] .vuelo-metrics-grid,
+[data-theme='dark'] .exclusion-geofences-block,
+[data-theme='dark'] .edit-profile-readonly,
+[data-theme='dark'] .edit-profile-badge-row,
+[data-theme='dark'] .modal-session-detail,
+[data-theme='dark'] .geofence-modal-header,
+[data-theme='dark'] .geofence-modal-footer,
+[data-theme='dark'] .bitacora-modal-body,
+[data-theme='dark'] .ajustes-modal-close,
+[data-theme='dark'] .bitacora-modal-close,
+[data-theme='dark'] .campus-live-pill,
+[data-theme='dark'] .programar-ruta-page,
+[data-theme='dark'] .programar-ruta-shell,
+[data-theme='dark'] .btn-logout-ajustes,
+[data-theme='dark'] .waypoint-warning-box,
+[data-theme='dark'] .emergency-modal__btn--cancel,
+[data-theme='dark'] .quick-actions__heading > span {
+  background: var(--dark-surface-2);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
+/* Chip/pill blanca sobre el reproductor de video */
+[data-theme='dark'] .preview-area-status {
+  background: rgb(11 18 32 / 92%);
+  color: var(--dark-text);
+}
+
+[data-theme='dark'] .preview-area-status strong svg {
+  color: var(--dark-accent);
+}
+
+/* Iconos tintados de las acciones del dron: tinte oscuro acorde */
+[data-theme='dark'] .drone-action__icon {
+  background: rgb(231 122 0 / 15%);
+  color: #fbbf24;
+}
+
+[data-theme='dark'] .drone-action:nth-child(2) .drone-action__icon {
+  background: rgb(56 189 248 / 15%);
+  color: var(--dark-accent);
+}
+
+[data-theme='dark'] .drone-action--mission .drone-action__icon {
+  background: rgb(34 197 94 / 15%);
+  color: #4ade80;
+}
+
+[data-theme='dark'] .drone-action--emergency {
+  background: rgb(225 29 72 / 16%);
+  color: #fda4af;
+}
+
+[data-theme='dark'] .drone-action--emergency .drone-action__icon {
+  background: transparent;
+  color: #fb7185;
+}
+
 /* --- Logo PNG oscuro → blanco (filtro, no toca fotos ni mapas) --- */
 [data-theme='dark'] img[alt='Emblema AeroLuferan'],
 [data-theme='dark'] img[alt^='Emblema de AeroLuferan'],
