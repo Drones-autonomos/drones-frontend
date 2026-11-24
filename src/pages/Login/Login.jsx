@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import brandLogo from '../../assets/aeroluferan-logo.png'
 import { getAuthenticatedUser, loginUser } from '../Admin/authSession.js'
 import { normalizeRole } from '../../services/alertService.js'
-import { getTheme, toggleTheme, THEME_CHANGED_EVENT } from '../../services/themeService.js'
 import './Login.css'
 
 const accountTypes = {
@@ -94,15 +93,6 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [theme, setTheme] = useState(getTheme)
-
-  useEffect(() => {
-    function syncTheme() {
-      setTheme(getTheme())
-    }
-    window.addEventListener(THEME_CHANGED_EVENT, syncTheme)
-    return () => window.removeEventListener(THEME_CHANGED_EVENT, syncTheme)
-  }, [])
 
   useEffect(() => {
     const existing = getAuthenticatedUser()
@@ -179,15 +169,6 @@ function Login() {
 
   return (
     <main className="login-page">
-      <button
-        type="button"
-        className="login-theme-toggle"
-        aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-        onClick={() => toggleTheme()}
-      >
-        {theme === 'dark' ? '☀' : '☾'}
-      </button>
       <div className="login-content">
         <header className="login-header">
           <BrandMark />

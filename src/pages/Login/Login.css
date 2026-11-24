@@ -639,29 +639,3 @@
   }
 }
 
-/* --- Toggle de modo oscuro (flotante, esquina superior derecha) --- */
-.login-theme-toggle {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1100;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid #e8eaff;
-  background: #ffffff;
-  color: #172f52;
-  font-size: 18px;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgb(23 47 82 / 18%);
-  transition: background 0.2s ease;
-}
-
-.login-theme-toggle:hover {
-  background: #f1f5f9;
-}
-
-.login-theme-toggle:focus-visible {
-  outline: 2px solid #0284c7;
-  outline-offset: 2px;
-}

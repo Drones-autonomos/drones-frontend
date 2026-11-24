@@ -4,6 +4,23 @@ import { logoutUser } from '../pages/Admin/authSession.js'
 import { getTheme, toggleTheme, THEME_CHANGED_EVENT } from '../services/themeService.js'
 import './UserAvatarMenu.css'
 
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+    </svg>
+  )
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+      <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+    </svg>
+  )
+}
+
 /**
  * Indicador de sesión en la esquina superior derecha: círculo con las
  * iniciales del usuario autenticado. Al hacer clic despliega una tarjeta
@@ -133,9 +150,15 @@ export default function UserAvatarMenu({ session }) {
             aria-checked={theme === 'dark'}
             onClick={() => toggleTheme()}
           >
-            <span className="theme-toggle-label">Modo oscuro</span>
+            <span className="theme-toggle-icon" aria-hidden="true">
+              {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+            </span>
+            <span className="theme-toggle-copy">
+              <strong>Modo oscuro</strong>
+              <span>{theme === 'dark' ? 'Activado' : 'Desactivado'}</span>
+            </span>
             <span className="theme-toggle-track" aria-hidden="true">
-              <span className={`theme-toggle-thumb${theme === 'dark' ? ' is-on' : ''}`} />
+              <span className="theme-toggle-thumb" />
             </span>
           </button>
 
