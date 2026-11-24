@@ -21,6 +21,7 @@ import {
   AI_SENSITIVITY_OPTIONS,
   getStoredSettings,
   saveSettings,
+  syncSettingsFromBackend,
   TRANSMISSION_QUALITY_OPTIONS,
 } from '../Admin/ajustesData.js'
 import { fetchOperatingWindow } from '../../services/settingsService.js'
@@ -83,6 +84,8 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
       setSettings(getStoredSettings())
     }
     window.addEventListener('aeroluferan_settings_updated', syncSettings)
+    // Carga inicial: los ajustes persistidos en el backend sobrescriben el caché local.
+    syncSettingsFromBackend()
     return () => window.removeEventListener('aeroluferan_settings_updated', syncSettings)
   }, [])
 
@@ -411,7 +414,8 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
             </section>
 
             {/* B. SEGURIDAD & CONTROL OPERATIVO */}
-            <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
             <section className="ajustes-group-card" aria-label="Seguridad y control operativo">
               {/* Alertas Push Críticas */}
               <div className="ajustes-item-row">
@@ -478,9 +482,11 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                 </div>
               </div>
             </section>
+            </div>
 
             {/* C. ALMACENAMIENTO & PRIVACIDAD (Sin "Ciclo de vida de los datos" para Guardia) */}
-            <h2 className="ajustes-section-title">ALMACENAMIENTO & PRIVACIDAD</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">ALMACENAMIENTO & PRIVACIDAD</h2>
             <section className="ajustes-group-card" aria-label="Almacenamiento y privacidad">
               {/* Cifrado de Video */}
               <div className="ajustes-item-row">
@@ -535,9 +541,11 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                 </button>
               </div>
             </section>
+            </div>
 
             {/* D. DISPOSITIVO & ESTACIÓN DE CARGA */}
-            <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
             <section className="ajustes-group-card" aria-label="Dispositivos y estaciones de carga">
               <div
                 className="ajustes-item-row"
@@ -570,9 +578,11 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                 </span>
               </div>
             </section>
+            </div>
 
             {/* E. AUDITORÍA & NORMATIVA (Sin "Registro de Auditoría Local" para Guardia) */}
-            <h2 className="ajustes-section-title">AUDITORÍA & NORMATIVA</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">AUDITORÍA & NORMATIVA</h2>
             <section className="ajustes-group-card" aria-label="Auditoría y normativa">
               {/* Privacidad Estudiantil & Espacio Aéreo */}
               <div className="ajustes-item-row">
@@ -626,6 +636,7 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                 </button>
               </div>
             </section>
+            </div>
 
             {/* F. BOTÓN CERRAR SESIÓN Y VERSIÓN */}
             <button

@@ -283,8 +283,9 @@
     align-items: start;
   }
 
-  /* Perfil, edición y cualquier hijo que no sea tarjeta de grupo van a lo ancho */
-  body .ajustes-content > :not(.ajustes-group-card) {
+  /* Cada grupo (título + tarjeta) es una celda del grid; perfil,
+     edición, logout y demás hijos directos van a lo ancho */
+  body .ajustes-content > :not(.ajustes-group) {
     grid-column: 1 / -1;
   }
 

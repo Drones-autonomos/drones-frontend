@@ -24,6 +24,7 @@ import {
   getStoredSettings,
   RETENTION_PERIOD_OPTIONS,
   saveSettings,
+  syncSettingsFromBackend,
   TRANSMISSION_QUALITY_OPTIONS,
 } from './ajustesData.js'
 import { generateAuditExportFile } from '../../services/flightLogService.js'
@@ -74,6 +75,8 @@ export default function Ajustes({ initialView = 'main' }) {
       setSettings(getStoredSettings())
     }
     window.addEventListener('aeroluferan_settings_updated', syncSettings)
+    // Carga inicial: los ajustes persistidos en el backend sobrescriben el caché local.
+    syncSettingsFromBackend()
     return () => window.removeEventListener('aeroluferan_settings_updated', syncSettings)
   }, [])
 
@@ -480,7 +483,8 @@ export default function Ajustes({ initialView = 'main' }) {
             </section>
 
             {/* B. SEGURIDAD & CONTROL OPERATIVO */}
-            <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
             <section className="ajustes-group-card" aria-label="Seguridad y control operativo">
               {/* Gestión de Usuarios Institucionales (Solo Admin -> POST /auth/register) */}
               <div
@@ -575,9 +579,11 @@ export default function Ajustes({ initialView = 'main' }) {
                 </div>
               </div>
             </section>
+            </div>
 
             {/* C. ALMACENAMIENTO & PRIVACIDAD */}
-            <h2 className="ajustes-section-title">ALMACENAMIENTO & PRIVACIDAD</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">ALMACENAMIENTO & PRIVACIDAD</h2>
             <section className="ajustes-group-card" aria-label="Almacenamiento y privacidad">
               {/* Ciclo de vida de los datos */}
               <div className="ajustes-item-row">
@@ -657,9 +663,11 @@ export default function Ajustes({ initialView = 'main' }) {
                 </button>
               </div>
             </section>
+            </div>
 
             {/* D. DISPOSITIVO & ESTACIÓN DE CARGA */}
-            <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
             <section className="ajustes-group-card" aria-label="Dispositivos y estaciones de carga">
               <div
                 className="ajustes-item-row"
@@ -692,9 +700,11 @@ export default function Ajustes({ initialView = 'main' }) {
                 </span>
               </div>
             </section>
+            </div>
 
             {/* E. AUDITORÍA & NORMATIVA */}
-            <h2 className="ajustes-section-title">AUDITORÍA & NORMATIVA</h2>
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">AUDITORÍA & NORMATIVA</h2>
             <section className="ajustes-group-card" aria-label="Auditoría y normativa">
               {/* Registro de Auditoría Local */}
               <div className="ajustes-item-row">
@@ -773,6 +783,7 @@ export default function Ajustes({ initialView = 'main' }) {
                 </button>
               </div>
             </section>
+            </div>
 
             {/* F. BOTÓN CERRAR SESIÓN Y VERSIÓN */}
             <button
