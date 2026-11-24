@@ -34,6 +34,8 @@ import {
   startMission,
   cancelMission,
   confirmMissionLanded,
+  getSchedulerStatus,
+  setSchedulerEnabled,
   MISSIONS_UPDATED_EVENT,
 } from '../../../services/missionService.js'
 import {
@@ -91,6 +93,14 @@ export default function GuardiaRutas() {
     const initialTimer = window.setTimeout(() => {
       loadMissions()
       syncGeofences()
+      getSchedulerStatus()
+        .then((status) => {
+          if (typeof status?.enabled === 'boolean') {
+            setAutonomousEnabled(status.enabled)
+            saveAutonomous(status.enabled)
+          }
+        })
+        .catch(() => {})
     }, 0)
 
     function syncSharedData() {
@@ -177,12 +187,23 @@ export default function GuardiaRutas() {
     return validateRouteAgainstGeofences(selectedMission.waypoints, geofences)
   }, [selectedMission, geofences])
 
-  // Manejo del interruptor de Vuelo Autónomo sincronizado
+  // El switch refleja el estado real del scheduler del servidor. La
+  // escritura requiere ADMIN: si el backend responde 403 se revierte y
+  // se muestra el aviso al operador.
   function handleToggleAutonomous() {
-    setAutonomousEnabled((prev) => {
-      const next = !prev
-      saveAutonomous(next)
-      return next
+    const next = !autonomousEnabled
+    setAutonomousEnabled(next)
+    saveAutonomous(next)
+    setSchedulerEnabled(next).catch((error) => {
+      setAutonomousEnabled(!next)
+      saveAutonomous(!next)
+      setFlightStatusMessage({
+        type: 'error',
+        text:
+          error?.status === 403
+            ? 'Solo el perfil Administrador puede activar o pausar el vuelo autónomo del servidor.'
+            : 'No se pudo actualizar el scheduler de vuelo autónomo en el servidor.',
+      })
     })
   }
 
@@ -753,7 +774,7 @@ export default function GuardiaRutas() {
           </div>
         </main>
 
-        {/* Modal de gestión de geocercas */}
+        {/* Modal de gestión de geocercas (GUARDIA: solo consulta) */}
         <GeofenceManagerModal
           isOpen={isGeofenceManagerOpen}
           onClose={() => setIsGeofenceManagerOpen(false)}
@@ -762,6 +783,7 @@ export default function GuardiaRutas() {
           onDeleteZone={handleDeleteZone}
           onEditZone={handleEditZone}
           onStartDrawing={() => setIsDrawingMode(true)}
+          readOnly
         />
 
         {/* Diálogo para nombrar y guardar una zona rectangular dibujada en el mapa */}

@@ -23,6 +23,7 @@ import {
 } from './rutasData.js'
 import { createMission, updateMission } from '../../services/missionService.js'
 import { validatePointAgainstGeofences } from '../../services/geofenceService.js'
+import apiClient from '../../services/apiClient.js'
 import { fetchPresetRoutes, getPresetRoutes } from './presetRoutes.js'
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
 import './ProgramarRuta.css'
@@ -48,25 +49,51 @@ export default function ProgramarRuta() {
   const isEditMode = Boolean(editMission?.id)
 
   const editSchedule = useMemo(() => {
-    const raw = editMission?.horario_inicio_programado
-    if (!raw) return null
-    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)
-    const date = new Date(hasZone ? raw : `${raw}Z`)
-    if (Number.isNaN(date.getTime())) return null
-    const pad = (n) => String(n).padStart(2, '0')
+    const toLocal = (raw) => {
+      if (!raw) return null
+      const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)
+      const date = new Date(hasZone ? raw : `${raw}Z`)
+      if (Number.isNaN(date.getTime())) return null
+      const pad = (n) => String(n).padStart(2, '0')
+      return {
+        date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+        time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+      }
+    }
     return {
-      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
-      time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+      start: toLocal(editMission?.horario_inicio_programado),
+      end: toLocal(editMission?.horario_fin_programado),
     }
   }, [editMission])
 
-  // 1. Checklist de Vuelo Aprobado (telemetría real: batería y enlace)
+  // 1. Checklist de Vuelo (telemetría real + /drone/preflight-check del backend)
   const telemetry = useDroneTelemetry()
   const batteryCard = telemetry?.cards?.find((c) => c.id === 'battery')
   const droneConnected = Boolean(telemetry?.link?.droneConnected)
+  const [preflightCheck, setPreflightCheck] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    apiClient
+      .get('/drone/preflight-check', { skipAuthRedirect: true })
+      .then((data) => {
+        if (!cancelled) setPreflightCheck(data)
+      })
+      .catch(() => {
+        if (!cancelled) setPreflightCheck(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const checklist = {
-    isApproved: droneConnected,
-    batteryText: batteryCard?.value ?? '—',
+    isApproved:
+      preflightCheck?.ready != null ? Boolean(preflightCheck.ready) : droneConnected,
+    batteryText:
+      preflightCheck?.checks?.battery?.value != null
+        ? `${Math.round(preflightCheck.checks.battery.value)}%`
+        : batteryCard?.value ?? '—',
     linkText: droneConnected ? `${telemetry?.drone?.signalPercentage ?? 0}%` : 'Sin enlace',
     transportText:
       telemetry?.link?.transport === 'ws'
@@ -79,31 +106,50 @@ export default function ProgramarRuta() {
   // 2. Nombre de la misión
   const [missionName, setMissionName] = useState(editMission?.name || '')
 
-  // 3. Waypoints y mapa interactivo
+  // 3. Waypoints y mapa interactivo (editables también en modo edición)
   const [waypoints, setWaypoints] = useState(
     editMission?.waypoints?.length >= 2 ? editMission.waypoints : [],
+  )
+  // Segundos de hover por waypoint (alineados por índice con `waypoints`).
+  const [waypointHovers, setWaypointHovers] = useState(() =>
+    (editMission?.backendWaypoints || []).map((wp) => wp.hover_segundos ?? 0),
   )
   const [geofences] = useState(getStoredGeofences)
 
   // 4. Altura operativa (30m a 200m AGL)
-  const [operatingHeight, setOperatingHeight] = useState(60)
+  const [operatingHeight, setOperatingHeight] = useState(() => {
+    const alt = editMission?.backendWaypoints?.[0]?.altitud_metros
+    return Number.isFinite(alt) ? Math.max(30, Math.min(200, alt)) : 60
+  })
 
   // 5. Geocercas de exclusión (evitación perimetral)
-  const [exclusionEnabled, setExclusionEnabled] = useState(true)
+  const [exclusionEnabled, setExclusionEnabled] = useState(
+    editMission?.evitacion_exclusion !== false,
+  )
 
   // 6. Planificación de vuelo (Fechas, horarios y helipuertos)
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const [departureDate, setDepartureDate] = useState(editSchedule?.date || todayStr)
-  const [departureTime, setDepartureTime] = useState(editSchedule?.time || '18:30')
-  const [departureHelipad, setDepartureHelipad] = useState(HELIPUERTOS[0])
+  const [departureDate, setDepartureDate] = useState(editSchedule?.start?.date || todayStr)
+  const [departureTime, setDepartureTime] = useState(editSchedule?.start?.time || '18:30')
+  const [departureHelipad, setDepartureHelipad] = useState(
+    editMission?.helipuerto_salida || HELIPUERTOS[0],
+  )
 
-  const [arrivalDate, setArrivalDate] = useState(todayStr)
-  const [arrivalTime, setArrivalTime] = useState('19:02')
-  const [arrivalHelipad, setArrivalHelipad] = useState(HELIPUERTOS[0])
+  const [arrivalDate, setArrivalDate] = useState(editSchedule?.end?.date || todayStr)
+  const [arrivalTime, setArrivalTime] = useState(editSchedule?.end?.time || '19:02')
+  const [arrivalHelipad, setArrivalHelipad] = useState(
+    editMission?.helipuerto_llegada || HELIPUERTOS[0],
+  )
 
   // Frecuencia y días seleccionados
-  const [isRecurring, setIsRecurring] = useState(true)
-  const [selectedDays, setSelectedDays] = useState(['lun', 'mar', 'mie', 'jue', 'vie'])
+  const [isRecurring, setIsRecurring] = useState(
+    editMission ? Boolean(editMission.es_recurrente) : true,
+  )
+  const [selectedDays, setSelectedDays] = useState(
+    editMission?.dias_semana?.length
+      ? editMission.dias_semana
+      : ['lun', 'mar', 'mie', 'jue', 'vie'],
+  )
 
   // Ruta preprogramada cargada en el mapa (null = ruta manual)
   const [activePresetId, setActivePresetId] = useState(null)
@@ -195,10 +241,21 @@ export default function ProgramarRuta() {
   // Cargar una ruta de patrullaje preprogramada al mapa y al formulario
   function applyPresetRoute(route) {
     setWaypoints(route.waypoints)
+    setWaypointHovers(
+      Array.isArray(route.hoverSegundos) ? [...route.hoverSegundos] : route.waypoints.map(() => 0),
+    )
     setMissionName(route.nombre)
     setOperatingHeight(route.altitudSugerida)
     setActivePresetId(route.id)
     setFormError(null)
+  }
+
+  // Mantener `waypointHovers` alineado por índice con `waypoints`.
+  function handleWaypointsChange(next) {
+    setWaypoints(next)
+    setWaypointHovers((prev) =>
+      next.map((pt, i) => (Number.isFinite(prev?.[i]) ? prev[i] : 0)),
+    )
   }
 
   // Manejo de selección de días de la semana
@@ -266,22 +323,53 @@ export default function ProgramarRuta() {
       `${calculatedDurationMinutes} min`,
     ].join(' · ')
 
+    // Batería mínima estimada: 30% base + 5% por cada 500 m de trayecto +
+    // 4% por cada 10 min de vuelo (acotada 30–85%).
+    const bateriaMinimaPct = Math.min(
+      85,
+      Math.max(
+        30,
+        30 + Math.round(pathDistance / 500) * 5 + Math.round(calculatedDurationMinutes / 10) * 4,
+      ),
+    )
+    const sensorOptico =
+      parseInt(departureTime.split(':')[0], 10) >= 6 &&
+      parseInt(departureTime.split(':')[0], 10) < 13
+        ? 'RGB 4K + IR'
+        : 'Térmica + IR'
+
+    const sharedFields = {
+      nombre: missionName,
+      descripcion,
+      horarioInicio: `${departureDate}T${departureTime}:00`,
+      horarioFin: `${arrivalDate}T${arrivalTime}:00`,
+      duracionEstimadaMin: calculatedDurationMinutes,
+      helipuertoSalida: departureHelipad,
+      helipuertoLlegada: arrivalHelipad,
+      esRecurrente: isRecurring,
+      diasSemana: isRecurring ? selectedDays : null,
+      evitacionExclusion: exclusionEnabled,
+      bateriaMinimaPct,
+      sensorOptico,
+    }
+
     try {
       setIsSaving(true)
       if (isEditMode) {
-        // PUT /missions/{id}: el backend no admite editar waypoints
+        // PUT /missions/{id}: el backend admite reemplazar waypoints y
+        // metadatos mientras la misión siga en estado PROGRAMADA.
         await updateMission(editMission.id, {
-          nombre: missionName,
-          descripcion,
-          horarioInicio: `${departureDate}T${departureTime}:00`,
+          ...sharedFields,
+          waypoints,
+          altitudMetros: operatingHeight,
+          hoverSegundos: waypointHovers,
         })
       } else {
         await createMission({
-          nombre: missionName,
-          descripcion,
-          horarioInicio: `${departureDate}T${departureTime}:00`,
+          ...sharedFields,
           waypoints,
           altitudMetros: operatingHeight,
+          hoverSegundos: waypointHovers,
         })
       }
       setSaveSuccess(true)
@@ -423,8 +511,8 @@ export default function ProgramarRuta() {
               <RutasMap
                 geofences={geofences}
                 waypoints={waypoints}
-                onWaypointsChange={setWaypoints}
-                allowWaypointEditing={!isEditMode}
+                onWaypointsChange={handleWaypointsChange}
+                allowWaypointEditing
                 tileMode="streets"
               />
 
@@ -448,9 +536,8 @@ export default function ProgramarRuta() {
 
             {isEditMode && (
               <div className="waypoint-warning-box" role="note">
-                <strong><EditIcon size={13} color="#0284C7" /> Edición de misión:</strong> Los waypoints no se pueden modificar
-                (el backend solo permite actualizar nombre, descripción y horario en una
-                misión PROGRAMADA).
+                <strong><EditIcon size={13} color="#0284C7" /> Edición de misión:</strong> puedes mover o
+                agregar waypoints y ajustar la altura; los cambios se guardan con «Guardar cambios».
               </div>
             )}
 

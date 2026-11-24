@@ -18,6 +18,7 @@ export function GeofenceManagerModal({
   onDeleteZone,
   onEditZone,
   onStartDrawing,
+  readOnly = false,
 }) {
   const [editingZoneId, setEditingZoneId] = useState(null)
   const [editName, setEditName] = useState('')
@@ -59,22 +60,29 @@ export function GeofenceManagerModal({
         </header>
 
         <div className="geofence-modal-body">
-          <div className="geofence-modal-top-actions">
-            <button
-              type="button"
-              className="geofence-btn-draw-trigger"
-              onClick={() => {
-                onClose()
-                onStartDrawing()
-              }}
-            >
-              <PlusIcon size={16} color="#ffffff" />
-              <span>Dibujar Nueva Zona Rectangular</span>
-            </button>
+          {!readOnly && (
+            <div className="geofence-modal-top-actions">
+              <button
+                type="button"
+                className="geofence-btn-draw-trigger"
+                onClick={() => {
+                  onClose()
+                  onStartDrawing()
+                }}
+              >
+                <PlusIcon size={16} color="#ffffff" />
+                <span>Dibujar Nueva Zona Rectangular</span>
+              </button>
+              <p className="geofence-modal-helper">
+                Haz clic para seleccionar el área directamente sobre el mapa satelital.
+              </p>
+            </div>
+          )}
+          {readOnly && (
             <p className="geofence-modal-helper">
-              Haz clic para seleccionar el área directamente sobre el mapa satelital.
+              Consulta del perímetro activo — la gestión de zonas requiere perfil Administrador.
             </p>
-          </div>
+          )}
 
           <h3 className="geofence-list-heading">Zonas Registradas ({geofences.length})</h3>
 
@@ -94,7 +102,7 @@ export function GeofenceManagerModal({
 
               return (
                 <li key={zone.id} className={`geofence-item geofence-item--${zone.type}`}>
-                  {isEditing ? (
+                  {isEditing && !readOnly ? (
                     <div className="geofence-item-edit-form">
                       <label>
                         <span>Nombre:</span>
@@ -176,34 +184,36 @@ export function GeofenceManagerModal({
                         </div>
                       </div>
 
-                      <div className="geofence-item-controls">
-                        <button
-                          type="button"
-                          className={`btn-toggle-zone${zone.status === 'Activa' ? ' is-active' : ''}`}
-                          onClick={() => onToggleStatus(zone.id)}
-                          title={zone.status === 'Activa' ? 'Desactivar zona' : 'Activar zona'}
-                        >
-                          {zone.status === 'Activa' ? 'Activa' : 'Pausada'}
-                        </button>
+                      {!readOnly && (
+                        <div className="geofence-item-controls">
+                          <button
+                            type="button"
+                            className={`btn-toggle-zone${zone.status === 'Activa' ? ' is-active' : ''}`}
+                            onClick={() => onToggleStatus(zone.id)}
+                            title={zone.status === 'Activa' ? 'Desactivar zona' : 'Activar zona'}
+                          >
+                            {zone.status === 'Activa' ? 'Activa' : 'Pausada'}
+                          </button>
 
-                        <button
-                          type="button"
-                          className="btn-icon-action"
-                          onClick={() => handleStartEdit(zone)}
-                          title="Editar zona"
-                        >
-                          <EditIcon size={15} color="#0284c7" />
-                        </button>
+                          <button
+                            type="button"
+                            className="btn-icon-action"
+                            onClick={() => handleStartEdit(zone)}
+                            title="Editar zona"
+                          >
+                            <EditIcon size={15} color="#0284c7" />
+                          </button>
 
-                        <button
-                          type="button"
-                          className="btn-icon-action"
-                          onClick={() => onDeleteZone(zone.id)}
-                          title="Eliminar zona"
-                        >
-                          <TrashIcon size={15} color="#ef4444" />
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            className="btn-icon-action"
+                            onClick={() => onDeleteZone(zone.id)}
+                            title="Eliminar zona"
+                          >
+                            <TrashIcon size={15} color="#ef4444" />
+                          </button>
+                        </div>
+                      )}
                     </>
                   )}
                 </li>

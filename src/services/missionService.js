@@ -110,16 +110,30 @@ export function mapBackendMission(mission) {
     status: estado,
     statusBadge: mission.error_ejecucion ? 'FALLIDA' : estadoUi.badge,
     statusType: mission.error_ejecucion ? 'fallida' : estadoUi.statusType,
-    duration: meta.duration || '—',
-    batteryRequired: '—',
-    opticalSensor: '—',
-    sensorColor: 'blue',
+    duration:
+      mission.duracion_estimada_min != null
+        ? `${mission.duracion_estimada_min} min`
+        : meta.duration || '—',
+    batteryRequired:
+      mission.bateria_minima_pct != null ? `${mission.bateria_minima_pct}%` : '—',
+    opticalSensor: mission.sensor_optico || '—',
+    sensorColor: mission.sensor_optico?.toLowerCase().includes('térm') ? 'purple' : 'blue',
     waypoints: latLngWaypoints,
     // Campos crudos del backend para lógica (inicio, cancelación, métricas)
     estado,
     descripcion: mission.descripcion || '',
     creado_por: mission.creado_por,
+    ejecutado_por: mission.ejecutado_por ?? null,
     horario_inicio_programado: mission.horario_inicio_programado,
+    horario_fin_programado: mission.horario_fin_programado,
+    duracion_estimada_min: mission.duracion_estimada_min ?? null,
+    helipuerto_salida: mission.helipuerto_salida || null,
+    helipuerto_llegada: mission.helipuerto_llegada || null,
+    es_recurrente: Boolean(mission.es_recurrente),
+    dias_semana: Array.isArray(mission.dias_semana) ? mission.dias_semana : [],
+    evitacion_exclusion: mission.evitacion_exclusion !== false,
+    bateria_minima_pct: mission.bateria_minima_pct ?? null,
+    sensor_optico: mission.sensor_optico || null,
     created_at: mission.created_at,
     iniciada_at: mission.iniciada_at,
     finalizada_at: mission.finalizada_at,
@@ -151,23 +165,57 @@ export async function getMission(id) {
  * @param {Array<[number, number]>} input.waypoints lista de [lat, lng]
  * @param {number} [input.altitudMetros] altitud AGL por waypoint (2–200)
  */
-export async function createMission({ nombre, descripcion, horarioInicio, waypoints, altitudMetros }) {
+function toIsoOrNull(value) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function buildWaypointPayload(waypoints, altitudMetros, hoverSegundos) {
+  const altitud = Number.isFinite(altitudMetros) ? altitudMetros : 15
+  return waypoints.map((pt, index) => ({
+    orden_waypoint: index + 1,
+    latitud: pt[0],
+    longitud: pt[1],
+    altitud_metros: altitud,
+    hover_segundos: Number.isFinite(hoverSegundos?.[index]) ? hoverSegundos[index] : 0,
+  }))
+}
+
+export async function createMission({
+  nombre,
+  descripcion,
+  horarioInicio,
+  waypoints,
+  altitudMetros,
+  hoverSegundos,
+  horarioFin,
+  duracionEstimadaMin,
+  helipuertoSalida,
+  helipuertoLlegada,
+  esRecurrente,
+  diasSemana,
+  evitacionExclusion,
+  bateriaMinimaPct,
+  sensorOptico,
+}) {
   if (!Array.isArray(waypoints) || waypoints.length < 2) {
     throw new Error('La ruta debe contener al menos dos waypoints.')
   }
-  const altitud = Number.isFinite(altitudMetros) ? altitudMetros : 15
   const payload = {
     nombre: nombre.trim(),
     descripcion: descripcion?.trim() || null,
-    horario_inicio_programado: horarioInicio
-      ? (horarioInicio instanceof Date ? horarioInicio : new Date(horarioInicio)).toISOString()
-      : null,
-    waypoints: waypoints.map((pt, index) => ({
-      orden_waypoint: index + 1,
-      latitud: pt[0],
-      longitud: pt[1],
-      altitud_metros: altitud,
-    })),
+    horario_inicio_programado: toIsoOrNull(horarioInicio),
+    horario_fin_programado: toIsoOrNull(horarioFin),
+    duracion_estimada_min: duracionEstimadaMin ?? null,
+    helipuerto_salida: helipuertoSalida || null,
+    helipuerto_llegada: helipuertoLlegada || null,
+    es_recurrente: Boolean(esRecurrente),
+    dias_semana: esRecurrente && Array.isArray(diasSemana) ? diasSemana : null,
+    evitacion_exclusion: evitacionExclusion !== false,
+    bateria_minima_pct: bateriaMinimaPct ?? null,
+    sensor_optico: sensorOptico || null,
+    waypoints: buildWaypointPayload(waypoints, altitudMetros, hoverSegundos),
   }
   const created = await apiClient.post('/missions/', payload)
   notifyMissionsUpdated({ type: 'created', mission: created })
@@ -179,13 +227,53 @@ export async function updateMission(id, fields) {
   if (fields.nombre !== undefined) payload.nombre = fields.nombre
   if (fields.descripcion !== undefined) payload.descripcion = fields.descripcion
   if (fields.horarioInicio !== undefined) {
-    payload.horario_inicio_programado = fields.horarioInicio
-      ? new Date(fields.horarioInicio).toISOString()
-      : null
+    payload.horario_inicio_programado = toIsoOrNull(fields.horarioInicio)
+  }
+  if (fields.horarioFin !== undefined) {
+    payload.horario_fin_programado = toIsoOrNull(fields.horarioFin)
+  }
+  if (fields.duracionEstimadaMin !== undefined) {
+    payload.duracion_estimada_min = fields.duracionEstimadaMin
+  }
+  if (fields.helipuertoSalida !== undefined) payload.helipuerto_salida = fields.helipuertoSalida
+  if (fields.helipuertoLlegada !== undefined) {
+    payload.helipuerto_llegada = fields.helipuertoLlegada
+  }
+  if (fields.esRecurrente !== undefined) payload.es_recurrente = Boolean(fields.esRecurrente)
+  if (fields.diasSemana !== undefined) {
+    payload.dias_semana = fields.esRecurrente ? fields.diasSemana : null
+  }
+  if (fields.evitacionExclusion !== undefined) {
+    payload.evitacion_exclusion = fields.evitacionExclusion
+  }
+  if (fields.bateriaMinimaPct !== undefined) payload.bateria_minima_pct = fields.bateriaMinimaPct
+  if (fields.sensorOptico !== undefined) payload.sensor_optico = fields.sensorOptico
+  if (Array.isArray(fields.waypoints) && fields.waypoints.length >= 2) {
+    payload.waypoints = buildWaypointPayload(
+      fields.waypoints,
+      fields.altitudMetros,
+      fields.hoverSegundos,
+    )
   }
   const updated = await apiClient.put(`/missions/${id}`, payload)
   notifyMissionsUpdated({ type: 'updated', mission: updated })
   return mapBackendMission(updated)
+}
+
+/** Elimina una misión en estado PROGRAMADA, CANCELADA o FALLIDA (solo ADMIN). */
+export async function deleteMission(id) {
+  await apiClient.delete(`/missions/${id}`)
+  notifyMissionsUpdated({ type: 'deleted', missionId: id })
+}
+
+/** Estado del scheduler de vuelo autónomo del servidor. */
+export async function getSchedulerStatus() {
+  return apiClient.get('/missions/scheduler', { skipAuthRedirect: true })
+}
+
+/** Activa/pausa el scheduler autónomo en el servidor (solo ADMIN). */
+export async function setSchedulerEnabled(enabled) {
+  return apiClient.put('/missions/scheduler', { enabled: Boolean(enabled) })
 }
 
 /** Inicia la ejecución de una misión PROGRAMADA (solo ADMIN). */
@@ -215,15 +303,44 @@ export async function getActiveMission() {
   return activas[0] || null
 }
 
+/**
+ * Misión relevante para el panel en vivo: la que está EN_CURSO, luego la
+ * que espera RECUPERACION, y por último la próxima PROGRAMADA (la de
+ * inicio más cercano; sin horario, la primera que devuelva el backend).
+ */
+export async function getRelevantMission() {
+  const [enCurso, recuperacion, programadas] = await Promise.all([
+    listMissions({ estado: 'EN_CURSO', limit: 1 }),
+    listMissions({ estado: 'RECUPERACION', limit: 1 }),
+    listMissions({ estado: 'PROGRAMADA', limit: 20 }),
+  ])
+  if (enCurso.length) return enCurso[0]
+  if (recuperacion.length) return recuperacion[0]
+  const sorted = [...programadas].sort((a, b) => {
+    const ta = a.horario_inicio_programado
+      ? new Date(a.horario_inicio_programado).getTime()
+      : Number.POSITIVE_INFINITY
+    const tb = b.horario_inicio_programado
+      ? new Date(b.horario_inicio_programado).getTime()
+      : Number.POSITIVE_INFINITY
+    return ta - tb
+  })
+  return sorted[0] || null
+}
+
 const missionService = {
   listMissions,
   getMission,
   createMission,
   updateMission,
+  deleteMission,
+  getSchedulerStatus,
+  setSchedulerEnabled,
   startMission,
   cancelMission,
   confirmMissionLanded,
   getActiveMission,
+  getRelevantMission,
   mapBackendMission,
 }
 

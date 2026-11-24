@@ -35,13 +35,21 @@ import {
   startMission,
   cancelMission,
   confirmMissionLanded,
+  deleteMission,
+  getSchedulerStatus,
+  setSchedulerEnabled,
   MISSIONS_UPDATED_EVENT,
 } from '../../services/missionService.js'
 import {
   syncGeofences,
   createGeofence,
+  updateBackendGeofence,
   toggleBackendGeofence,
   deleteBackendGeofence,
+  createExclusionZone,
+  updateExclusionZone,
+  toggleBackendExclusionZone,
+  deleteBackendExclusionZone,
 } from '../../services/geofenceService.js'
 import { droneControlService } from '../../services/droneControlService.js'
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
@@ -94,6 +102,14 @@ export default function Rutas() {
     const initialTimer = window.setTimeout(() => {
       loadMissions()
       syncGeofences()
+      getSchedulerStatus()
+        .then((status) => {
+          if (typeof status?.enabled === 'boolean') {
+            setAutonomousEnabled(status.enabled)
+            saveAutonomous(status.enabled)
+          }
+        })
+        .catch(() => {})
     }, 0)
 
     function syncData() {
@@ -199,12 +215,22 @@ export default function Rutas() {
     }
   }
 
-  // Manejo del interruptor de Vuelo Autónomo
+  // Manejo del interruptor de Vuelo Autónomo: controla el scheduler real
+  // del servidor (PUT /missions/scheduler) y conserva el valor como caché local.
   function handleToggleAutonomous() {
-    setAutonomousEnabled((prev) => {
-      const next = !prev
-      saveAutonomous(next)
-      return next
+    const next = !autonomousEnabled
+    setAutonomousEnabled(next)
+    saveAutonomous(next)
+    setSchedulerEnabled(next).catch((error) => {
+      setAutonomousEnabled(!next)
+      saveAutonomous(!next)
+      setFlightStatusMessage({
+        type: 'error',
+        text:
+          error?.status === 403
+            ? 'Cambiar el vuelo autónomo del servidor requiere perfil Administrador.'
+            : 'No se pudo actualizar el scheduler de vuelo autónomo en el servidor.',
+      })
     })
   }
 
@@ -303,6 +329,34 @@ export default function Rutas() {
     navigate('/admin/programar-ruta', { state: { editMission: mission } })
   }
 
+  // Eliminación de misión en estado PROGRAMADA / CANCELADA / FALLIDA
+  async function handleDeleteMission(mission, event) {
+    event?.stopPropagation?.()
+    setFlightStatusMessage(null)
+    try {
+      setPendingActionId(mission.id)
+      await deleteMission(mission.id)
+      if (selectedMission?.id === mission.id) setSelectedMissionId(null)
+      setFlightStatusMessage({
+        type: 'success',
+        text: `Misión "${mission.name}" eliminada del sistema.`,
+      })
+      await loadMissions({ silent: true })
+    } catch (error) {
+      setFlightStatusMessage({
+        type: 'error',
+        text:
+          error?.status === 409
+            ? 'Solo se pueden eliminar misiones PROGRAMADA, CANCELADA o FALLIDA.'
+            : error instanceof Error
+              ? error.message
+              : 'No se pudo eliminar la misión.',
+      })
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
   // Confirmación de aterrizaje tras interrupción (RECUPERACION → FINALIZADA)
   async function handleConfirmLanded(mission, event) {
     event?.stopPropagation?.()
@@ -325,12 +379,16 @@ export default function Rutas() {
     }
   }
 
-  // Manejadores de geocercas (zonas autorizadas → backend; exclusiones → local)
+  // Manejadores de geocercas: informativas → /geofences;
+  // advertencia/restringida → /exclusion-zones; locales → offline.
   async function handleToggleZoneStatus(zoneId) {
     const zone = geofences.find((z) => z.id === zoneId)
     if (zone?.backendId) {
       try {
-        const updatedZone = await toggleBackendGeofence(zone.backendId)
+        const updatedZone =
+          zone.backendKind === 'exclusion'
+            ? await toggleBackendExclusionZone(zone.backendId)
+            : await toggleBackendGeofence(zone.backendId)
         setGeofences((prev) => {
           const updated = prev.map((z) => (z.id === zoneId ? { ...updatedZone } : z))
           saveGeofences(updated)
@@ -360,7 +418,11 @@ export default function Rutas() {
     const zone = geofences.find((z) => z.id === zoneId)
     if (zone?.backendId) {
       try {
-        await deleteBackendGeofence(zone.backendId)
+        if (zone.backendKind === 'exclusion') {
+          await deleteBackendExclusionZone(zone.backendId)
+        } else {
+          await deleteBackendGeofence(zone.backendId)
+        }
       } catch (error) {
         setFlightStatusMessage({
           type: 'error',
@@ -379,9 +441,46 @@ export default function Rutas() {
     })
   }
 
-  function handleEditZone(zoneId, updatedFields) {
-    // El backend no expone edición de geocercas; los cambios de nombre/motivo
-    // se conservan en la capa local de presentación.
+  async function handleEditZone(zoneId, updatedFields) {
+    const zone = geofences.find((z) => z.id === zoneId)
+    const merged = zone ? { ...zone, ...updatedFields } : null
+    if (!merged) return
+    if (zone.backendId) {
+      try {
+        let persisted = merged
+        if (zone.backendKind === 'exclusion') {
+          persisted = await updateExclusionZone(zone.backendId, merged)
+        } else {
+          // Una geocerca operativa reclasificada como exclusión se recrea en
+          // /exclusion-zones y se elimina la geocerca original.
+          persisted =
+            merged.type === 'informativa'
+              ? await updateBackendGeofence(zone.backendId, merged)
+              : await createExclusionZone(merged)
+          if (merged.type !== 'informativa') {
+            await deleteBackendGeofence(zone.backendId)
+          }
+        }
+        setGeofences((prev) => {
+          const updated = prev.map((z) => (z.id === zoneId ? { ...persisted } : z))
+          saveGeofences(updated)
+          return updated
+        })
+        setFlightStatusMessage({
+          type: 'success',
+          text: `Zona "${persisted.name}" actualizada en el servidor.`,
+        })
+        return
+      } catch (error) {
+        setFlightStatusMessage({
+          type: 'error',
+          text:
+            error?.status === 403
+              ? 'Editar geocercas requiere perfil Administrador. Cambios solo en esta sesión.'
+              : 'Sin conexión con el backend: cambios solo en esta sesión.',
+        })
+      }
+    }
     setGeofences((prev) => {
       const updated = prev.map((z) => (z.id === zoneId ? { ...z, ...updatedFields } : z))
       saveGeofences(updated)
@@ -400,31 +499,33 @@ export default function Rutas() {
       ...zoneData,
     }
 
-    // Las zonas 'informativa' representan geocercas operativas autorizadas y
-    // se persisten en el backend (solo ADMIN). El resto queda local.
-    if (zoneData.type === 'informativa') {
-      try {
-        const created = await createGeofence(baseZone)
-        setGeofences((prev) => {
-          const updated = [...prev, created]
-          saveGeofences(updated)
-          return updated
-        })
-        setPendingZoneBounds(null)
-        setFlightStatusMessage({
-          type: 'success',
-          text: `Geocerca operativa "${created.name}" registrada en el servidor.`,
-        })
-        return
-      } catch (error) {
-        setFlightStatusMessage({
-          type: 'error',
-          text:
-            error?.status === 403
-              ? 'Registrar geocercas operativas requiere perfil Administrador. La zona se conservó solo en esta sesión.'
-              : 'Sin conexión con el backend: la zona se conservó solo en esta sesión.',
-        })
-      }
+    // Todas las clasificaciones se persisten en el backend:
+    // 'informativa' → /geofences/ (zona operativa autorizada);
+    // 'advertencia'/'restringida' → /exclusion-zones/ (solo ADMIN).
+    try {
+      const created =
+        zoneData.type === 'informativa'
+          ? await createGeofence(baseZone)
+          : await createExclusionZone(baseZone)
+      setGeofences((prev) => {
+        const updated = [...prev, created]
+        saveGeofences(updated)
+        return updated
+      })
+      setPendingZoneBounds(null)
+      setFlightStatusMessage({
+        type: 'success',
+        text: `Zona "${created.name}" registrada en el servidor.`,
+      })
+      return
+    } catch (error) {
+      setFlightStatusMessage({
+        type: 'error',
+        text:
+          error?.status === 403
+            ? 'Registrar geocercas requiere perfil Administrador. La zona se conservó solo en esta sesión.'
+            : 'Sin conexión con el backend: la zona se conservó solo en esta sesión.',
+      })
     }
 
     const newZone = { ...baseZone, source: 'local' }
@@ -716,6 +817,17 @@ export default function Rutas() {
                             title="Confirmar que el dron aterrizó y liberar la reserva"
                           >
                             {pendingActionId === mission.id ? '…' : 'Confirmar aterrizaje'}
+                          </button>
+                        )}
+                        {['PROGRAMADA', 'CANCELADA', 'FALLIDA'].includes(mission.estado) && (
+                          <button
+                            type="button"
+                            className="vuelo-cancel-btn"
+                            disabled={pendingActionId === mission.id}
+                            onClick={(e) => handleDeleteMission(mission, e)}
+                            title="Eliminar misión del sistema"
+                          >
+                            {pendingActionId === mission.id ? '…' : 'Eliminar'}
                           </button>
                         )}
                       </div>

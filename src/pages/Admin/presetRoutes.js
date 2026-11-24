@@ -149,24 +149,32 @@ let presetRoutesCache = null
 /**
  * Normaliza un preset del backend al shape interno que usa ProgramarRuta:
  * { id, nombre, descripcion, waypoints: [[lat, lng], ...], altitudSugerida }.
- * Los waypoints del backend son objetos {latitud, longitud, hover_s?}.
+ * Los waypoints del backend son objetos {latitud, longitud, hover_s?};
+ * `hover_s` se preserva por índice en `hoverSegundos`.
  */
 function mapBackendPreset(preset) {
   if (!preset || typeof preset !== 'object') return null
   const rawWaypoints = Array.isArray(preset.waypoints) ? preset.waypoints : []
-  const waypoints = rawWaypoints
-    .map((wp) => {
-      if (Array.isArray(wp)) return [wp[0], wp[1]]
-      if (wp && typeof wp === 'object') return [wp.latitud, wp.longitud]
-      return null
-    })
-    .filter((pt) => Array.isArray(pt) && Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
+  const waypoints = []
+  const hoverSegundos = []
+  for (const wp of rawWaypoints) {
+    const pt = Array.isArray(wp)
+      ? [wp[0], wp[1]]
+      : wp && typeof wp === 'object'
+        ? [wp.latitud, wp.longitud]
+        : null
+    if (!Array.isArray(pt) || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) continue
+    waypoints.push(pt)
+    const hover = wp && typeof wp === 'object' ? wp.hover_s : null
+    hoverSegundos.push(Number.isFinite(hover) ? hover : 0)
+  }
   if (waypoints.length < 2) return null
   return {
     id: preset.id,
     nombre: preset.name || preset.id,
     descripcion: preset.description || '',
     waypoints,
+    hoverSegundos,
     altitudSugerida: Number.isFinite(preset.altitude_m) ? preset.altitude_m : 30,
     routeLengthM: preset.route_length_m ?? null,
     clearanceM: preset.clearance_m ?? null,
