@@ -15,7 +15,8 @@ npm run lint     # eslint sobre src/
 Verificación mínima tras cambios: `npm run lint && npm run build`.
 
 El stack completo (DB + API + SITL + frontend) se levanta con
-`../scripts/dev-stack.sh`; el flujo demo E2E está en `../docs/E2E_DEMO.md`.
+`../drones-backend/scripts/dev-stack.sh`; el flujo demo E2E está en
+`../drones-backend/docs/E2E_DEMO.md`.
 
 ## Arquitectura de servicios (`src/services/`)
 
