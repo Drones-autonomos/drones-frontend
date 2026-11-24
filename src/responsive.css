@@ -113,7 +113,8 @@
   }
 
   /* ------------------------------------------------------------------
-     3. RUTAS (Admin + Guardia): mapa a la izquierda, misiones a la derecha
+     3. RUTAS (Admin + Guardia): mapa a la izquierda, rail de misiones
+        a la derecha que se extiende junto a todo el contenido
      ------------------------------------------------------------------ */
   body .rutas-content {
     display: grid;
@@ -121,19 +122,28 @@
     align-items: start;
   }
 
-  body .rutas-content > .autonomous-card,
-  body .rutas-content > .route-warning-banner,
-  body .rutas-content > .prevuelo-card,
-  body .rutas-content > .btn-programar-ruta {
+  body .rutas-content > .autonomous-card {
     grid-column: 1 / -1;
   }
 
-  body .rutas-content > .campus-card {
+  /* Columna izquierda: geocerca/mapa + avisos + acciones + prevuelo */
+  body .rutas-content > .campus-card,
+  body .rutas-content > .route-warning-banner,
+  body .rutas-content > .btn-iniciar-vuelo,
+  body .rutas-content > .btn-programar-ruta,
+  body .rutas-content > .ajustar-perimetro-row,
+  body .rutas-content > .prevuelo-card {
     grid-column: 1;
   }
 
+  body .rutas-content > .campus-card {
+    grid-row: 2;
+  }
+
+  /* Columna derecha: misiones programadas ancladas junto al mapa */
   body .rutas-content > .vuelos-programados-section {
     grid-column: 2;
+    grid-row: 2 / span 8;
   }
 
   body .campus-map-box {
@@ -257,12 +267,12 @@
   body .rutas-shell,
   body .bitacora-shell,
   body .programar-ruta-shell {
-    width: min(calc(100% - 48px), 1560px);
+    width: min(calc(100% - 48px), 1700px);
   }
 
   body .alertas-shell,
   body .alertas-guardia-shell {
-    width: min(calc(100% - 48px), 1420px);
+    width: min(calc(100% - 48px), 1500px);
   }
 
   body .ajustes-shell {
