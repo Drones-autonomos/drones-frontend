@@ -96,21 +96,37 @@
     padding-left: 236px;
   }
 
-  /* Shells: ancho completo tras el sidebar con escala de consola.
-     La UI base es mobile-scale y en escritorio se veía pequeña;
-     `zoom` amplía tipografía, tarjetas e iconos proporcionalmente.
-     El ancho se divide entre el factor porque zoom escala también
-     el 100% (sin esto el shell desborda y se recorta bajo el
-     sidebar); igualmente los calc(100vh…) se dividen abajo. */
+  /* Shells: ancho completo tras el sidebar a escala nativa, igual
+     que EnVivo (referencia de layout correcta). Se descartó `zoom`:
+     desplazaba los clics en los mapas Leaflet, desenfocaba el render
+     y obligaba a compensar cada calc(100vh). */
   body .rutas-shell,
   body .bitacora-shell,
   body .programar-ruta-shell,
   body .alertas-shell,
   body .alertas-guardia-shell,
   body .ajustes-shell {
-    width: calc(100% / 1.15);
+    width: 100%;
     max-width: none;
-    zoom: 1.15;
+  }
+
+  /* Respiro de escritorio en cabeceras y contenido: los paddings base
+     son de móvil (~16px); EnVivo usa ~30/40px. */
+  body .rutas-header,
+  body .bitacora-header,
+  body .programar-header-bar,
+  body .alertas-header,
+  body .alertas-guardia-header,
+  body .ajustes-header {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  body .rutas-content,
+  body .bitacora-content,
+  body .programar-content,
+  body .ajustes-content {
+    padding: 24px 32px 48px;
   }
 
   /* ------------------------------------------------------------------
@@ -149,18 +165,18 @@
     grid-row: 2 / span 8;
     position: sticky;
     top: 16px;
-    max-height: calc((100vh - 32px) / 1.15);
+    max-height: calc(100vh - 32px);
   }
 
   body .vuelos-programados-section > .vuelos-cards-list {
-    max-height: calc((100vh - 110px) / 1.15);
+    max-height: calc(100vh - 110px);
     overflow-y: auto;
     padding-right: 6px;
     scrollbar-width: thin;
   }
 
   body .campus-map-box {
-    height: 460px;
+    height: 480px;
   }
 
   /* ------------------------------------------------------------------
@@ -200,7 +216,22 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
     align-content: start;
-    padding: 0 24px 24px;
+    padding: 8px 32px 48px;
+  }
+
+  /* Secciones entre header y lista: alinear al respiro de 32px */
+  body .monitor-card,
+  body .alertas-guardia-monitor,
+  body .alertas-guardia-status-banner {
+    margin-left: 32px;
+    margin-right: 32px;
+  }
+
+  body .alert-filters,
+  body .alertas-guardia-filters,
+  body .alertas-guardia-quick-toolbar {
+    padding-left: 32px;
+    padding-right: 32px;
   }
 
   /* ------------------------------------------------------------------
@@ -306,25 +337,6 @@ body .emergency-modal-backdrop {
    ESCRITORIO AMPLIO (≥1600px): aprovechar pantallas grandes/ultrawide
    ========================================================================== */
 @media (min-width: 1600px) {
-  /* Escala un poco mayor en pantallas amplias */
-  body .rutas-shell,
-  body .bitacora-shell,
-  body .programar-ruta-shell,
-  body .alertas-shell,
-  body .alertas-guardia-shell,
-  body .ajustes-shell {
-    width: calc(100% / 1.25);
-    zoom: 1.25;
-  }
-
-  body .rutas-content > .vuelos-programados-section {
-    max-height: calc((100vh - 32px) / 1.25);
-  }
-
-  body .vuelos-programados-section > .vuelos-cards-list {
-    max-height: calc((100vh - 110px) / 1.25);
-  }
-
   body .campus-map-box {
     height: 560px;
   }
