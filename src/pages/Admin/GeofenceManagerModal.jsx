@@ -18,12 +18,14 @@ export function GeofenceManagerModal({
   onDeleteZone,
   onEditZone,
   onStartDrawing,
+  onFlyToZone,
   readOnly = false,
 }) {
   const [editingZoneId, setEditingZoneId] = useState(null)
   const [editName, setEditName] = useState('')
   const [editType, setEditType] = useState('informativa')
   const [editReason, setEditReason] = useState('')
+  const [editTope, setEditTope] = useState('')
 
   if (!isOpen) return null
 
@@ -32,13 +34,16 @@ export function GeofenceManagerModal({
     setEditName(zone.name)
     setEditType(zone.type)
     setEditReason(zone.restrictionReason || '')
+    setEditTope(Number.isFinite(zone.estructuraTopeM) ? String(zone.estructuraTopeM) : '')
   }
 
   function handleSaveEdit(zoneId) {
+    const tope = parseFloat(editTope)
     onEditZone(zoneId, {
       name: editName.trim(),
       type: editType,
       restrictionReason: editReason.trim(),
+      estructuraTopeM: Number.isFinite(tope) && tope > 0 ? tope : null,
     })
     setEditingZoneId(null)
   }
@@ -132,6 +137,20 @@ export function GeofenceManagerModal({
                           placeholder="Ej. Tope de altura o interferencia"
                         />
                       </label>
+                      {editType !== 'informativa' && (
+                        <label>
+                          <span>Tope de estructura (m, opcional):</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="200"
+                            step="0.5"
+                            value={editTope}
+                            onChange={(e) => setEditTope(e.target.value)}
+                            placeholder="Ej. 15 — sobrevolar por encima queda permitido"
+                          />
+                        </label>
+                      )}
                       <div className="geofence-edit-actions">
                         <button
                           type="button"
@@ -195,6 +214,17 @@ export function GeofenceManagerModal({
                             {zone.status === 'Activa' ? 'Activa' : 'Pausada'}
                           </button>
 
+                          {onFlyToZone && (
+                            <button
+                              type="button"
+                              className="btn-icon-action"
+                              onClick={() => onFlyToZone(zone.bounds)}
+                              title="Centrar zona en el mapa"
+                            >
+                              <AdjustSliderIcon size={15} color="#0284c7" />
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             className="btn-icon-action"
@@ -212,6 +242,31 @@ export function GeofenceManagerModal({
                           >
                             <TrashIcon size={15} color="#ef4444" />
                           </button>
+                        </div>
+                      )}
+
+                      {readOnly && (onFlyToZone || onDeleteZone) && (
+                        <div className="geofence-item-controls">
+                          {onFlyToZone && (
+                            <button
+                              type="button"
+                              className="btn-icon-action"
+                              onClick={() => onFlyToZone(zone.bounds)}
+                              title="Centrar zona en el mapa"
+                            >
+                              <AdjustSliderIcon size={15} color="#0284c7" />
+                            </button>
+                          )}
+                          {onDeleteZone && (
+                            <button
+                              type="button"
+                              className="btn-icon-action"
+                              onClick={() => onDeleteZone(zone.id)}
+                              title="Eliminar zona"
+                            >
+                              <TrashIcon size={15} color="#ef4444" />
+                            </button>
+                          )}
                         </div>
                       )}
                     </>
@@ -242,6 +297,7 @@ export function NewZoneDialog({
   const [name, setName] = useState('')
   const [type, setType] = useState('restringida')
   const [reason, setReason] = useState('')
+  const [tope, setTope] = useState('')
 
   if (!isOpen || !bounds) return null
 
@@ -249,6 +305,7 @@ export function NewZoneDialog({
     e.preventDefault()
     if (!name.trim()) return
 
+    const topeVal = parseFloat(tope)
     onSave({
       name: name.trim(),
       type,
@@ -257,6 +314,7 @@ export function NewZoneDialog({
       badgeCode: name.trim().slice(0, 3).toUpperCase(),
       status: 'Activa',
       description: reason.trim() || 'Zona configurada por el operador.',
+      estructuraTopeM: Number.isFinite(topeVal) && topeVal > 0 ? topeVal : null,
     })
   }
 
@@ -307,6 +365,21 @@ export function NewZoneDialog({
               onChange={(e) => setReason(e.target.value)}
             />
           </label>
+
+          {type !== 'informativa' && (
+            <label className="form-label-block">
+              <span>Tope de estructura (m, opcional):</span>
+              <input
+                type="number"
+                min="0"
+                max="200"
+                step="0.5"
+                placeholder="Ej. 15 — la zona solo bloquea vuelo bajo ese techo"
+                value={tope}
+                onChange={(e) => setTope(e.target.value)}
+              />
+            </label>
+          )}
 
           <div className="geofence-bounds-preview">
             <span>Esquina 1: [{bounds[0][0].toFixed(5)}, {bounds[0][1].toFixed(5)}]</span>

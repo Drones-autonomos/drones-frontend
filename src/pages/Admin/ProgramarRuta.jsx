@@ -22,7 +22,7 @@ import {
   validateRouteAgainstGeofences,
 } from './rutasData.js'
 import { createMission, updateMission } from '../../services/missionService.js'
-import { validatePointAgainstGeofences } from '../../services/geofenceService.js'
+import { validateRouteOnBackend } from '../../services/geofenceService.js'
 import apiClient from '../../services/apiClient.js'
 import { fetchPresetRoutes, getPresetRoutes } from './presetRoutes.js'
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
@@ -116,11 +116,31 @@ export default function ProgramarRuta() {
   )
   const [geofences] = useState(getStoredGeofences)
 
-  // 4. Altura operativa (30m a 200m AGL)
+  // 4. Altura operativa — los límites del slider vienen de
+  // GET /settings/operating-window (NormativeConfig); el fallback replica la
+  // normativa por defecto si el backend no responde.
+  const [altLimits, setAltLimits] = useState({ min: 30, max: 200 })
   const [operatingHeight, setOperatingHeight] = useState(() => {
     const alt = editMission?.backendWaypoints?.[0]?.altitud_metros
     return Number.isFinite(alt) ? Math.max(30, Math.min(200, alt)) : 60
   })
+
+  useEffect(() => {
+    let cancelled = false
+    apiClient
+      .get('/settings/operating-window', { skipAuthRedirect: true })
+      .then((cfg) => {
+        if (cancelled || !cfg) return
+        const min = Number.isFinite(cfg.altitud_minima_m) ? cfg.altitud_minima_m : 30
+        const max = Number.isFinite(cfg.altitud_maxima_m) ? cfg.altitud_maxima_m : 200
+        setAltLimits({ min, max })
+        setOperatingHeight((h) => Math.max(min, Math.min(max, h)))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // 5. Geocercas de exclusión (evitación perimetral)
   const [exclusionEnabled, setExclusionEnabled] = useState(
@@ -232,11 +252,11 @@ export default function ProgramarRuta() {
     return selectedDays.map((d) => d.toUpperCase()).join(', ')
   }, [isRecurring, selectedDays])
 
-  // Validación de advertencias de geocercas
+  // Validación de advertencias de geocercas (consciente del tope por waypoint)
   const routeValidation = useMemo(() => {
     if (!exclusionEnabled) return { conflicts: [], hasCriticalConflict: false }
-    return validateRouteAgainstGeofences(waypoints, geofences)
-  }, [waypoints, geofences, exclusionEnabled])
+    return validateRouteAgainstGeofences(waypoints, geofences, operatingHeight)
+  }, [waypoints, geofences, exclusionEnabled, operatingHeight])
 
   // Cargar una ruta de patrullaje preprogramada al mapa y al formulario
   function applyPresetRoute(route) {
@@ -251,11 +271,18 @@ export default function ProgramarRuta() {
   }
 
   // Mantener `waypointHovers` alineado por índice con `waypoints`.
-  function handleWaypointsChange(next) {
+  // `removedIndex` llega cuando el mapa elimina un waypoint: el hover asociado
+  // se elimina por índice en lugar de realinear por posición.
+  function handleWaypointsChange(next, removedIndex = null) {
     setWaypoints(next)
-    setWaypointHovers((prev) =>
-      next.map((pt, i) => (Number.isFinite(prev?.[i]) ? prev[i] : 0)),
-    )
+    setWaypointHovers((prev) => {
+      const base = Array.isArray(prev) ? prev : []
+      if (Number.isInteger(removedIndex)) {
+        const filtered = base.filter((_, i) => i !== removedIndex)
+        return next.map((_, i) => (Number.isFinite(filtered[i]) ? filtered[i] : 0))
+      }
+      return next.map((_, i) => (Number.isFinite(base[i]) ? base[i] : 0))
+    })
   }
 
   // Manejo de selección de días de la semana
@@ -296,19 +323,27 @@ export default function ProgramarRuta() {
       return
     }
 
-    // 5. Pre-validación en backend: cada waypoint debe caer dentro de alguna
-    // geocerca activa (POST /geofences/validate-point). Si el backend no
-    // responde (null) se continúa y el servidor valida en el POST final.
+    // 5. Pre-validación en backend: una sola llamada batch a
+    // POST /geofences/validate-route evalúa geocercas operativas y zonas de
+    // exclusión (con tope de estructura). Si el backend no responde (null) se
+    // continúa y el servidor valida en el POST/PUT final.
     if (!isEditMode) {
-      for (let i = 0; i < waypoints.length; i += 1) {
-        const [lat, lon] = waypoints[i]
-        const verdict = await validatePointAgainstGeofences(lat, lon, operatingHeight)
-        if (verdict && verdict.permitido === false) {
-          setFormError(
-            `El waypoint ${i + 1} (${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}) fue rechazado por el servidor: ${verdict.motivo || 'fuera de las zonas operativas autorizadas'}.`,
-          )
-          return
-        }
+      const routeVerdict = await validateRouteOnBackend(
+        waypoints.map(([lat, lon]) => ({
+          latitud: lat,
+          longitud: lon,
+          altitud_metros: operatingHeight,
+        })),
+      )
+      if (routeVerdict && routeVerdict.valid === false) {
+        const blockers = routeVerdict.violations.filter((v) => v.tipo !== 'advertencia')
+        const first = blockers[0]
+        const suffix = blockers.length > 1 ? ` (+${blockers.length - 1} más)` : ''
+        const where = first?.waypoint_index ? `waypoint ${first.waypoint_index}: ` : ''
+        setFormError(
+          `La trayectoria fue rechazada por el servidor — ${where}${first?.motivo || 'fuera del perímetro autorizado'}${suffix}.`,
+        )
+        return
       }
     }
 
@@ -561,17 +596,17 @@ export default function ProgramarRuta() {
 
               {/* Slider de altura */}
               <div className="height-slider-container">
-                <span className="slider-limit-label">30m</span>
+                <span className="slider-limit-label">{altLimits.min}m</span>
                 <input
                   type="range"
-                  min="30"
-                  max="200"
+                  min={altLimits.min}
+                  max={altLimits.max}
                   value={operatingHeight}
                   onChange={(e) => setOperatingHeight(Number(e.target.value))}
                   className="height-range-slider"
                   aria-label="Seleccionar altura operativa en metros AGL"
                 />
-                <span className="slider-limit-label">200m</span>
+                <span className="slider-limit-label">{altLimits.max}m</span>
               </div>
 
               {/* Indicador de normativa */}
@@ -878,9 +913,9 @@ export default function ProgramarRuta() {
         )}
 
         {/* ============================================================== */}
-        {/* BARRA DE NAVEGACIÓN INFERIOR (Con Bitácora seleccionada)      */}
+        {/* BARRA DE NAVEGACIÓN INFERIOR (Con Rutas seleccionada)         */}
         {/* ============================================================== */}
-        <AdminBottomNav activePath="/admin/bitacora" />
+        <AdminBottomNav activePath="/admin/rutas" />
       </div>
     </div>
   )

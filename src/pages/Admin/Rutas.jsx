@@ -143,10 +143,12 @@ export default function Rutas() {
   // Ruta seleccionada actualmente para visualización e inicio
   const [selectedMissionId, setSelectedMissionId] = useState(null)
 
-  // 5. Verificación de prevuelo (batería y enlace reales desde telemetría)
+  // 5. Verificación de prevuelo (batería, viento y enlace reales desde telemetría)
   const telemetryCards = telemetry?.cards || []
   const batteryCard = telemetryCards.find((c) => c.id === 'battery')
+  const windCard = telemetryCards.find((c) => c.id === 'wind')
   const droneConnected = Boolean(droneLink.droneConnected)
+  const programadasCount = missions.filter((m) => m.estado === 'PROGRAMADA').length
   const operatingCeiling = deriveOperatingCeiling(geofences)
   const preflight = {
     ...PREFLIGHT_BASE,
@@ -164,7 +166,11 @@ export default function Rutas() {
       isCompliant: operatingCeiling != null ? operatingCeiling <= 200 : null,
     },
     metrics: {
-      wind: { ...PREFLIGHT_BASE.metrics.wind },
+      wind: {
+        ...PREFLIGHT_BASE.metrics.wind,
+        value: windCard?.value ?? '—',
+        statusLabel: windCard?.detail ?? (droneConnected ? 'Telemetría real' : 'Sin estación'),
+      },
       battery: {
         ...PREFLIGHT_BASE.metrics.battery,
         value: batteryCard?.value ?? '—',
@@ -347,7 +353,8 @@ export default function Rutas() {
         type: 'error',
         text:
           error?.status === 409
-            ? 'Solo se pueden eliminar misiones PROGRAMADA, CANCELADA o FALLIDA.'
+            ? error.message ||
+              'Solo se pueden eliminar misiones PROGRAMADA, CANCELADA o FALLIDA sin bitácora sellada.'
             : error instanceof Error
               ? error.message
               : 'No se pudo eliminar la misión.',
@@ -449,7 +456,16 @@ export default function Rutas() {
       try {
         let persisted = merged
         if (zone.backendKind === 'exclusion') {
-          persisted = await updateExclusionZone(zone.backendId, merged)
+          // Una zona de exclusión reclasificada como 'informativa' se recrea en
+          // /geofences (zona operativa) y se elimina la exclusión original —
+          // simétrico a la conversión informativa → exclusión de abajo.
+          persisted =
+            merged.type === 'informativa'
+              ? await createGeofence(merged)
+              : await updateExclusionZone(zone.backendId, merged)
+          if (merged.type === 'informativa') {
+            await deleteBackendExclusionZone(zone.backendId)
+          }
         } else {
           // Una geocerca operativa reclasificada como exclusión se recrea en
           // /exclusion-zones y se elimina la geocerca original.
@@ -584,7 +600,7 @@ export default function Rutas() {
               </span>
               <div className="autonomous-info">
                 <strong>Vuelo Autónomo Activo</strong>
-                <span>{missions.length} Rutas Programadas</span>
+                <span>{programadasCount} Rutas Programadas</span>
               </div>
             </div>
 
@@ -722,7 +738,7 @@ export default function Rutas() {
             <div className="vuelos-programados-header">
               <h2 id="vuelos-prog-heading">Vuelos Programados</h2>
               <span className="vuelos-count">
-                {missions.length} {missions.length === 1 ? 'Ruta' : 'Rutas'}
+                {programadasCount} {programadasCount === 1 ? 'Ruta' : 'Rutas'}
               </span>
             </div>
 

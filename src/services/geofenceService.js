@@ -148,6 +148,9 @@ export function mapZoneToExclusionPayload(zone) {
     motivo: zone.restrictionReason || null,
     descripcion: zone.description || null,
     codigo_badge: zone.badgeCode || null,
+    // Tope de estructura en metros (arcotecho, grúa): la zona solo bloquea
+    // vuelo por debajo de ese techo; sobrevolarla por encima sigue válido.
+    altitud_max_m: Number.isFinite(zone.estructuraTopeM) ? zone.estructuraTopeM : null,
   }
 }
 
@@ -226,6 +229,24 @@ export async function validatePointAgainstGeofences(latitud, longitud, altitudMe
     return await apiClient.post(
       '/geofences/validate-point',
       { latitud, longitud, altitud_metros: altitudMetros },
+      { skipAuthRedirect: true },
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Valida una trayectoria completa en UNA sola petición:
+ * POST /geofences/validate-route con [{latitud, longitud, altitud_metros}].
+ * Retorna { valid, violations: [{tipo: 'geocerca'|'exclusion'|'advertencia', motivo, waypoint_index}] }
+ * o null si el backend no respondió.
+ */
+export async function validateRouteOnBackend(waypoints) {
+  try {
+    return await apiClient.post(
+      '/geofences/validate-route',
+      { waypoints },
       { skipAuthRedirect: true },
     )
   } catch {

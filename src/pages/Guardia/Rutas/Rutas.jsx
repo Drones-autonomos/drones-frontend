@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import GuardiaBottomNav from '../../../components/GuardiaBottomNav.jsx'
 import helmetLogo from '../../../assets/helmet-logo.png'
@@ -18,7 +18,7 @@ import {
   WindBlowIcon,
 } from '../../../components/RutasIcons.jsx'
 import RutasMap from '../../Admin/RutasMap.jsx'
-import { GeofenceManagerModal, NewZoneDialog } from '../../Admin/GeofenceManagerModal.jsx'
+import { GeofenceManagerModal } from '../../Admin/GeofenceManagerModal.jsx'
 import {
   PREFLIGHT_BASE,
   deriveOperatingCeiling,
@@ -35,14 +35,12 @@ import {
   cancelMission,
   confirmMissionLanded,
   getSchedulerStatus,
-  setSchedulerEnabled,
   MISSIONS_UPDATED_EVENT,
 } from '../../../services/missionService.js'
 import {
   syncGeofences,
-  createGeofence,
-  toggleBackendGeofence,
   deleteBackendGeofence,
+  deleteBackendExclusionZone,
 } from '../../../services/geofenceService.js'
 import './Rutas.css'
 
@@ -135,10 +133,12 @@ export default function GuardiaRutas() {
   // Ruta seleccionada actualmente para visualización
   const [selectedMissionId, setSelectedMissionId] = useState(null)
 
-  // 5. Verificación de prevuelo (batería y enlace reales desde telemetría)
+  // 5. Verificación de prevuelo (batería, viento y enlace reales desde telemetría)
   const telemetryCards = telemetry?.cards || []
   const batteryCard = telemetryCards.find((c) => c.id === 'battery')
+  const windCard = telemetryCards.find((c) => c.id === 'wind')
   const droneConnected = Boolean(droneLink.droneConnected)
+  const programadasCount = missions.filter((m) => m.estado === 'PROGRAMADA').length
   const operatingCeiling = deriveOperatingCeiling(geofences)
   const preflight = {
     ...PREFLIGHT_BASE,
@@ -156,7 +156,11 @@ export default function GuardiaRutas() {
       isCompliant: operatingCeiling != null ? operatingCeiling <= 200 : null,
     },
     metrics: {
-      wind: { ...PREFLIGHT_BASE.metrics.wind },
+      wind: {
+        ...PREFLIGHT_BASE.metrics.wind,
+        value: windCard?.value ?? '—',
+        statusLabel: windCard?.detail ?? (droneConnected ? 'Telemetría real' : 'Sin estación'),
+      },
       battery: {
         ...PREFLIGHT_BASE.metrics.battery,
         value: batteryCard?.value ?? '—',
@@ -172,9 +176,8 @@ export default function GuardiaRutas() {
 
   // 6. Estados de modales y herramientas del mapa
   const [isGeofenceManagerOpen, setIsGeofenceManagerOpen] = useState(false)
-  const [isDrawingMode, setIsDrawingMode] = useState(false)
-  const [pendingZoneBounds, setPendingZoneBounds] = useState(null)
   const [flightStatusMessage, setFlightStatusMessage] = useState(null)
+  const mapRef = useRef(null)
 
   const selectedMission = useMemo(
     () => missions.find((m) => m.id === selectedMissionId) || missions[0],
@@ -188,27 +191,11 @@ export default function GuardiaRutas() {
   }, [selectedMission, geofences])
 
   // El switch refleja el estado real del scheduler del servidor. La
-  // escritura requiere ADMIN: si el backend responde 403 se revierte y
-  // se muestra el aviso al operador.
-  function handleToggleAutonomous() {
-    const next = !autonomousEnabled
-    setAutonomousEnabled(next)
-    saveAutonomous(next)
-    setSchedulerEnabled(next).catch((error) => {
-      setAutonomousEnabled(!next)
-      saveAutonomous(!next)
-      setFlightStatusMessage({
-        type: 'error',
-        text:
-          error?.status === 403
-            ? 'Solo el perfil Administrador puede activar o pausar el vuelo autónomo del servidor.'
-            : 'No se pudo actualizar el scheduler de vuelo autónomo en el servidor.',
-      })
-    })
-  }
+  // escritura requiere ADMIN (PUT /missions/scheduler → 403 para GUARDIA):
+  // el botón se renderiza deshabilitado mostrando el valor real.
 
   // Manejo del botón "Iniciar Vuelo" / "Monitorear En Vivo" para el perfil Guardia.
-  // Nota de roles: iniciar misión requiere ADMIN; el backend responde 403 a GUARDIA.
+  // Iniciar misión PROGRAMADA está habilitado para GUARDIA en el backend.
   async function handleIniciarVuelo() {
     setFlightStatusMessage(null)
     if (!selectedMission) return
@@ -297,9 +284,8 @@ export default function GuardiaRutas() {
     }
   }
 
-  // Confirmación de aterrizaje tras interrupción (RECUPERACION → FINALIZADA).
-  // Nota de roles: el endpoint es solo ADMIN; para GUARDIA responde 403 y el
-  // mensaje del servidor se muestra en flightStatusMessage.
+  // Confirmación de aterrizaje tras interrupción (RECUPERACION → FALLIDA
+  // con bitácora sellada). Habilitado para GUARDIA en el backend.
   async function handleConfirmLanded(mission, event) {
     event?.stopPropagation?.()
     setFlightStatusMessage(null)
@@ -322,49 +308,28 @@ export default function GuardiaRutas() {
   }
 
   // Manejadores de geocercas sincronizados.
-  // Nota de roles: crear/activar/eliminar geocercas del backend es solo ADMIN;
-  // para GUARDIA el servidor responde 403 y se muestra el mensaje al operador.
-  async function handleToggleZoneStatus(zoneId) {
-    const zone = geofences.find((z) => z.id === zoneId)
-    if (zone?.backendId) {
-      try {
-        const updatedZone = await toggleBackendGeofence(zone.backendId)
-        setGeofences((prev) => {
-          const updated = prev.map((z) => (z.id === zoneId ? { ...updatedZone } : z))
-          saveGeofences(updated)
-          return updated
-        })
-      } catch (error) {
-        setFlightStatusMessage({
-          type: 'error',
-          text:
-            error?.status === 403
-              ? 'Cambiar el estado de las geocercas operativas requiere perfil Administrador.'
-              : 'No se pudo actualizar la geocerca en el servidor.',
-        })
-      }
-      return
-    }
-    setGeofences((prev) => {
-      const updated = prev.map((z) =>
-        z.id === zoneId ? { ...z, status: z.status === 'Activa' ? 'Inactiva' : 'Activa' } : z,
-      )
-      saveGeofences(updated)
-      return updated
-    })
+  // Guardia no crea/edita/activa geocercas: solo consulta el listado, centra
+  // zonas en el mapa y puede eliminar zonas (el backend responde 403 si la
+  // zona proviene del servidor — el aviso se muestra al operador).
+  function handleZoneFlyTo(bounds) {
+    mapRef.current?.flyToBounds?.(bounds)
   }
 
   async function handleDeleteZone(zoneId) {
     const zone = geofences.find((z) => z.id === zoneId)
     if (zone?.backendId) {
       try {
-        await deleteBackendGeofence(zone.backendId)
+        if (zone.backendKind === 'exclusion') {
+          await deleteBackendExclusionZone(zone.backendId)
+        } else {
+          await deleteBackendGeofence(zone.backendId)
+        }
       } catch (error) {
         setFlightStatusMessage({
           type: 'error',
           text:
             error?.status === 403
-              ? 'Eliminar geocercas operativas requiere perfil Administrador.'
+              ? 'Eliminar geocercas del servidor requiere perfil Administrador.'
               : 'No se pudo eliminar la geocerca en el servidor.',
         })
         return
@@ -375,61 +340,6 @@ export default function GuardiaRutas() {
       saveGeofences(updated)
       return updated
     })
-  }
-
-  function handleEditZone(zoneId, updatedFields) {
-    // El backend no expone edición de geocercas; los cambios de nombre/motivo
-    // se conservan en la capa local de presentación.
-    setGeofences((prev) => {
-      const updated = prev.map((z) => (z.id === zoneId ? { ...z, ...updatedFields } : z))
-      saveGeofences(updated)
-      return updated
-    })
-  }
-
-  function handleZoneCreatedOnMap(bounds) {
-    setIsDrawingMode(false)
-    setPendingZoneBounds(bounds)
-  }
-
-  async function handleSaveNewZone(zoneData) {
-    const baseZone = {
-      id: `geo-${Date.now()}`,
-      ...zoneData,
-    }
-
-    if (zoneData.type === 'informativa') {
-      try {
-        const created = await createGeofence(baseZone)
-        setGeofences((prev) => {
-          const updated = [...prev, created]
-          saveGeofences(updated)
-          return updated
-        })
-        setPendingZoneBounds(null)
-        setFlightStatusMessage({
-          type: 'success',
-          text: `Geocerca operativa "${created.name}" registrada en el servidor.`,
-        })
-        return
-      } catch (error) {
-        setFlightStatusMessage({
-          type: 'error',
-          text:
-            error?.status === 403
-              ? 'Registrar geocercas operativas requiere perfil Administrador. La zona se conservó solo en esta sesión.'
-              : 'Sin conexión con el backend: la zona se conservó solo en esta sesión.',
-        })
-      }
-    }
-
-    const newZone = { ...baseZone, source: 'local' }
-    setGeofences((prev) => {
-      const updated = [...prev, newZone]
-      saveGeofences(updated)
-      return updated
-    })
-    setPendingZoneBounds(null)
   }
 
   return (
@@ -468,7 +378,7 @@ export default function GuardiaRutas() {
               </span>
               <div className="autonomous-info">
                 <strong>Vuelo Autónomo Activo</strong>
-                <span>{missions.length} Rutas Programadas</span>
+                <span>{programadasCount} Rutas Programadas</span>
               </div>
             </div>
 
@@ -477,8 +387,9 @@ export default function GuardiaRutas() {
               className={`autonomous-toggle-btn${autonomousEnabled ? ' is-on' : ''}`}
               role="switch"
               aria-checked={autonomousEnabled}
-              aria-label="Activar o desactivar ejecución de vuelos autónomos"
-              onClick={handleToggleAutonomous}
+              aria-label="Estado del vuelo autónomo (solo lectura para Guardia)"
+              disabled
+              title="Solo el perfil Administrador puede activar o pausar el vuelo autónomo"
             >
               <span className="toggle-thumb">
                 {autonomousEnabled && <ToggleCheckIcon size={12} color="#10B981" />}
@@ -509,12 +420,10 @@ export default function GuardiaRutas() {
             {/* Mapa interactivo con Leaflet */}
             <div className="campus-map-box">
               <RutasMap
+                ref={mapRef}
                 geofences={geofences}
                 selectedRoute={selectedMission}
                 missionRoutes={missions}
-                isDrawingMode={isDrawingMode}
-                onZoneCreated={handleZoneCreatedOnMap}
-                onCancelDrawing={() => setIsDrawingMode(false)}
               />
             </div>
 
@@ -608,7 +517,7 @@ export default function GuardiaRutas() {
             <div className="vuelos-programados-header">
               <h2 id="guard-vuelos-heading">Vuelos Programados</h2>
               <span className="vuelos-count">
-                {missions.length} {missions.length === 1 ? 'Ruta' : 'Rutas'}
+                {programadasCount} {programadasCount === 1 ? 'Ruta' : 'Rutas'}
               </span>
             </div>
 
@@ -774,24 +683,14 @@ export default function GuardiaRutas() {
           </div>
         </main>
 
-        {/* Modal de gestión de geocercas (GUARDIA: solo consulta) */}
+        {/* Modal de gestión de geocercas (GUARDIA: solo consulta + eliminar) */}
         <GeofenceManagerModal
           isOpen={isGeofenceManagerOpen}
           onClose={() => setIsGeofenceManagerOpen(false)}
           geofences={geofences}
-          onToggleStatus={handleToggleZoneStatus}
           onDeleteZone={handleDeleteZone}
-          onEditZone={handleEditZone}
-          onStartDrawing={() => setIsDrawingMode(true)}
+          onFlyToZone={handleZoneFlyTo}
           readOnly
-        />
-
-        {/* Diálogo para nombrar y guardar una zona rectangular dibujada en el mapa */}
-        <NewZoneDialog
-          isOpen={Boolean(pendingZoneBounds)}
-          bounds={pendingZoneBounds}
-          onSave={handleSaveNewZone}
-          onCancel={() => setPendingZoneBounds(null)}
         />
 
         {/* ============================================================== */}

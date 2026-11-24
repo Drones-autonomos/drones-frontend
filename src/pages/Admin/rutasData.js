@@ -221,42 +221,80 @@ function segmentIntersectsBounds(p1, p2, bounds) {
 /**
  * Validación completa de ruta frente a todas las geocercas registradas.
  * Retorna las zonas intersectadas diferenciando entre informativas, advertencias y restringidas.
+ *
+ * Semántica (paridad con el backend):
+ * - 'informativa' = perímetro operativo AUTORIZADO: no es un cruce prohibido;
+ *   solo alerta cuando un waypoint sale de TODAS las geocercas operativas activas.
+ * - 'restringida'/'advertencia' con `estructuraTopeM` solo bloquean/advierten
+ *   puntos internos volando por debajo del tope (sobrevolar la estructura es válido).
  */
-export function validateRouteAgainstGeofences(waypoints, geofences) {
+export function validateRouteAgainstGeofences(waypoints, geofences, altitudMetros = null) {
   if (!waypoints || waypoints.length < 2) return { conflicts: [], warnings: [], hasCriticalConflict: false }
 
   const detectedConflicts = []
+  const active = (geofences || []).filter((zone) => zone.status !== 'Inactiva')
+  const operativas = active.filter((zone) => zone.type === 'informativa')
+  const exclusiones = active.filter((zone) => zone.type !== 'informativa')
 
-  for (const zone of geofences) {
-    if (zone.status === 'Inactiva') continue
-    let intersects = false
+  const waypointAlt = (pt) =>
+    Number.isFinite(pt?.[2]) ? pt[2] : Number.isFinite(altitudMetros) ? altitudMetros : null
 
-    // Verificar si algún waypoint cae dentro de la zona
+  const segmentCrosses = (zone) => {
     for (const pt of waypoints) {
-      if (isPointInsideBounds(pt, zone.bounds)) {
-        intersects = true
-        break
-      }
+      if (isPointInsideBounds(pt, zone.bounds)) return true
     }
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      if (segmentIntersectsBounds(waypoints[i], waypoints[i + 1], zone.bounds)) return true
+    }
+    return false
+  }
 
-    // Verificar si algún segmento de la ruta cruza los límites de la zona
-    if (!intersects) {
-      for (let i = 0; i < waypoints.length - 1; i++) {
-        if (segmentIntersectsBounds(waypoints[i], waypoints[i + 1], zone.bounds)) {
-          intersects = true
-          break
-        }
-      }
-    }
+  // 1. Zonas de exclusión: conflicto al entrar en el rectángulo; con tope de
+  //    estructura solo cuando el punto interno vuela a altitud <= tope.
+  for (const zone of exclusiones) {
+    const tope = Number.isFinite(zone.estructuraTopeM) ? zone.estructuraTopeM : null
+    // Sin tope: entrar al rectángulo bloquea. Con tope: solo los waypoints
+    // dentro del rectángulo volando a altitud <= tope bloquean.
+    const intersects =
+      tope === null
+        ? segmentCrosses(zone)
+        : waypoints.some((pt) => {
+            const alt = waypointAlt(pt)
+            return (
+              isPointInsideBounds(pt, zone.bounds) && (alt === null || alt <= tope)
+            )
+          })
 
     if (intersects) {
       detectedConflicts.push({
         zoneId: zone.id,
         zoneName: zone.name,
         type: zone.type,
-        reason: zone.restrictionReason || zone.description,
+        reason:
+          tope !== null
+            ? `${zone.restrictionReason || zone.description} (tope ${tope} m)`
+            : zone.restrictionReason || zone.description,
         isRestricted: zone.type === 'restringida',
         isWarning: zone.type === 'advertencia',
+      })
+    }
+  }
+
+  // 2. Perímetro operativo: si existen geocercas 'informativa' activas, cada
+  //    waypoint debe caer dentro de al menos una — salir del perímetro alerta.
+  if (operativas.length > 0) {
+    const waypointsFuera = waypoints.filter(
+      (pt) => !operativas.some((zone) => isPointInsideBounds(pt, zone.bounds)),
+    )
+    if (waypointsFuera.length > 0) {
+      detectedConflicts.push({
+        zoneId: 'perimetro-operativo',
+        zoneName: 'Perímetro operativo autorizado',
+        type: 'informativa',
+        reason: `${waypointsFuera.length} waypoint(s) fuera de todas las geocercas operativas activas.`,
+        isRestricted: false,
+        isWarning: true,
+        isPerimeterExit: true,
       })
     }
   }

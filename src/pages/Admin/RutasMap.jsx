@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { CompassTargetIcon } from '../../components/RutasIcons.jsx'
@@ -6,6 +6,7 @@ import { CAMPUS_CENTER, CAMPUS_DEFAULT_ZOOM } from './rutasData.js'
 import { PATROL_BASES } from './presetRoutes.js'
 
 export default function RutasMap({
+  ref = null,
   geofences = [],
   selectedRoute = null,
   // Todas las misiones con ruta: se dibujan atenuadas; la seleccionada destaca
@@ -26,6 +27,15 @@ export default function RutasMap({
   const labelLayerRef = useRef(null)
   const drawingStateRef = useRef({ tempRect: null })
   const [firstCorner, setFirstCorner] = useState(null)
+
+  // API imperativa para centrar una zona/misión desde el exterior del mapa.
+  useImperativeHandle(ref, () => ({
+    flyToBounds(bounds) {
+      const map = mapInstanceRef.current
+      if (!map || !bounds) return
+      map.flyToBounds(L.latLngBounds(bounds).pad(0.2), { maxZoom: 18 })
+    },
+  }))
 
   // Inicialización del mapa Leaflet
   useEffect(() => {
@@ -266,7 +276,9 @@ export default function RutasMap({
               if (btn) {
                 btn.onclick = () => {
                   const updated = activeWaypoints.filter((_, i) => i !== idx)
-                  onWaypointsChange(updated)
+                  // Segundo argumento: índice eliminado, para que el consumidor
+                  // realinee metadatos por-waypoint (p. ej. hovers).
+                  onWaypointsChange(updated, idx)
                 }
               }
             })

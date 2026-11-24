@@ -283,6 +283,16 @@ export async function startMission(id) {
   return mapBackendMission(updated)
 }
 
+/**
+ * Crea e inicia de inmediato una misión de patrullaje preprogramada
+ * (clasica|interior|canchas). Habilitado para ADMIN y GUARDIA.
+ */
+export async function startPresetMission(presetKey) {
+  const updated = await apiClient.post(`/missions/start-preset/${presetKey}`)
+  notifyMissionsUpdated({ type: 'started', mission: updated })
+  return mapBackendMission(updated)
+}
+
 /** Cancela una misión (ADMIN y GUARDIA). EN_CURSO pasa a CANCELANDO con RTL. */
 export async function cancelMission(id) {
   const updated = await apiClient.post(`/missions/${id}/cancel`)
@@ -309,12 +319,14 @@ export async function getActiveMission() {
  * inicio más cercano; sin horario, la primera que devuelva el backend).
  */
 export async function getRelevantMission() {
-  const [enCurso, recuperacion, programadas] = await Promise.all([
+  const [enCurso, cancelando, recuperacion, programadas] = await Promise.all([
     listMissions({ estado: 'EN_CURSO', limit: 1 }),
+    listMissions({ estado: 'CANCELANDO', limit: 1 }),
     listMissions({ estado: 'RECUPERACION', limit: 1 }),
     listMissions({ estado: 'PROGRAMADA', limit: 20 }),
   ])
   if (enCurso.length) return enCurso[0]
+  if (cancelando.length) return cancelando[0]
   if (recuperacion.length) return recuperacion[0]
   const sorted = [...programadas].sort((a, b) => {
     const ta = a.horario_inicio_programado
@@ -337,6 +349,7 @@ const missionService = {
   getSchedulerStatus,
   setSchedulerEnabled,
   startMission,
+  startPresetMission,
   cancelMission,
   confirmMissionLanded,
   getActiveMission,
