@@ -140,10 +140,22 @@
     grid-row: 2;
   }
 
-  /* Columna derecha: misiones programadas ancladas junto al mapa */
+  /* Columna derecha: rail de misiones anclado junto al mapa.
+     Es sticky con scroll interno para que la página no quede más
+     alta que la columna izquierda (elimina el vacío bajo prevuelo). */
   body .rutas-content > .vuelos-programados-section {
     grid-column: 2;
     grid-row: 2 / span 8;
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+  }
+
+  body .vuelos-programados-section > .vuelos-cards-list {
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    padding-right: 6px;
+    scrollbar-width: thin;
   }
 
   body .campus-map-box {
