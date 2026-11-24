@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { fetchCurrentUser, getAuthenticatedUser } from '../pages/Admin/authSession.js'
 import { normalizeRole } from '../services/alertService.js'
+import UserAvatarMenu from './UserAvatarMenu.jsx'
 
 /**
  * Guarda de rutas con verificación de JWT y rol RBAC ('admin' | 'guard').
@@ -58,5 +59,10 @@ export default function ProtectedRoute({ allowedRoles = ['admin', 'guard'], chil
     return <Navigate to={fallbackPath} replace />
   }
 
-  return children
+  return (
+    <>
+      <UserAvatarMenu session={session} />
+      {children}
+    </>
+  )
 }
