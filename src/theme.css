@@ -51,9 +51,42 @@
 
 /* --- Login (sin sesión, fuera de ProtectedRoute) --- */
 [data-theme='dark'] .login-content {
+  color: var(--dark-text);
+}
+
+[data-theme='dark'] .login-form {
   background: var(--dark-surface);
   border-color: var(--dark-border);
   color: var(--dark-text);
+}
+
+[data-theme='dark'] .field-label,
+[data-theme='dark'] .account-label,
+[data-theme='dark'] .field-link,
+[data-theme='dark'] .register-prompt,
+[data-theme='dark'] .login-footer p {
+  color: var(--dark-text-muted);
+}
+
+[data-theme='dark'] .account-icon {
+  background: var(--dark-surface);
+  color: var(--dark-text-muted);
+}
+
+[data-theme='dark'] .is-selected .account-icon {
+  background: rgb(56 189 248 / 18%);
+  color: var(--dark-accent);
+}
+
+[data-theme='dark'] .login-error-alert {
+  background: rgb(225 29 72 / 14%);
+  border-color: rgb(225 29 72 / 40%);
+  color: #fda4af;
+}
+
+[data-theme='dark'] .input-shell > svg,
+[data-theme='dark'] .password-toggle svg {
+  stroke: var(--dark-text-muted);
 }
 
 [data-theme='dark'] .account-option,
@@ -306,6 +339,62 @@
 /* --- Toggle del switch de tema dentro del menú --- */
 [data-theme='dark'] .theme-toggle-row {
   border-top: 1px solid var(--dark-border);
+}
+
+/* --- Superficies extendidas (headers, wrappers y tarjetas blancas restantes) --- */
+[data-theme='dark'] .rutas-header,
+[data-theme='dark'] .ajustes-header,
+[data-theme='dark'] .bitacora-header,
+[data-theme='dark'] .alertas-header,
+[data-theme='dark'] .alertas-guardia-header,
+[data-theme='dark'] .live-header,
+[data-theme='dark'] .programar-header-bar,
+[data-theme='dark'] .registro-card,
+[data-theme='dark'] .mission-name-card,
+[data-theme='dark'] .preset-routes-card,
+[data-theme='dark'] .map-overlay-card,
+[data-theme='dark'] .flight-card-bitacora,
+[data-theme='dark'] .flight-cards-list,
+[data-theme='dark'] .vuelos-cards-list,
+[data-theme='dark'] .guardia-placeholder-card,
+[data-theme='dark'] .programar-modal-box,
+[data-theme='dark'] .modal-field-block,
+[data-theme='dark'] .mission-name-input-wrap,
+[data-theme='dark'] .bitacora-search-bar,
+[data-theme='dark'] .bitacora-search-wrapper,
+[data-theme='dark'] .ajustes-option-item,
+[data-theme='dark'] .telemetry-card-section,
+[data-theme='dark'] .status-placeholder,
+[data-theme='dark'] .status-placeholder__action,
+[data-theme='dark'] .map-badge-label,
+[data-theme='dark'] .map-recenter-btn,
+[data-theme='dark'] .alertas-notification-button,
+[data-theme='dark'] .alertas-guardia-notification-button,
+[data-theme='dark'] .emergency-modal,
+[data-theme='dark'] .rbac-card__icon-wrapper,
+[data-theme='dark'] .profile-card__avatar-wrap,
+[data-theme='dark'] .edit-profile-avatar-circle,
+[data-theme='dark'] .drone-action__icon,
+[data-theme='dark'] .registro-input-shell,
+[data-theme='dark'] .btn-programar-ruta,
+[data-theme='dark'] .btn-ajustar-perimetro,
+[data-theme='dark'] .btn-icon-action,
+[data-theme='dark'] .btn-modal-cancel,
+[data-theme='dark'] .btn-ajustes-modal-cancel,
+[data-theme='dark'] .btn-toggle-zone,
+[data-theme='dark'] .vuelo-cancel-btn {
+  background: var(--dark-surface);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
+/* --- Logo PNG oscuro → blanco (filtro, no toca fotos ni mapas) --- */
+[data-theme='dark'] img[alt='Emblema AeroLuferan'],
+[data-theme='dark'] img[alt^='Emblema de AeroLuferan'],
+[data-theme='dark'] .login-brand-mark,
+[data-theme='dark'] .alertas-brand-logo,
+[data-theme='dark'] .alertas-guardia-brand-logo {
+  filter: brightness(0) invert(1);
 }
 
 /* --- Mapa Leaflet: atenuar tiles sin invertir colores --- */
