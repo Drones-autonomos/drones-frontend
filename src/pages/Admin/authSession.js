@@ -1,63 +1,149 @@
 /**
- * Gestión de Sesión y Control de Acceso Basado en Roles (RBAC) para AeroLuferan.
- * Preparado para conectarse con el sistema RBAC del backend y base de datos.
+ * Gestión de Sesión JWT Real y Control de Acceso Basado en Roles (RBAC) para AeroLuferan.
+ * Conectado con /api/v1/auth/login, /api/v1/auth/me y /api/v1/auth/register.
  */
 
-export const SESSION_STORAGE_KEY = 'aeroluferan_session'
+import apiClient, {
+  getStoredSession,
+  SESSION_STORAGE_KEY,
+} from '../../services/apiClient.js'
+import { normalizeRole } from '../../services/alertService.js'
+
+export { SESSION_STORAGE_KEY }
+
+export const REGISTERED_USERS_KEY = 'aeroluferan_registered_users'
 
 export const DEFAULT_ADMIN_USER = {
-  id: 'usr-admin-01',
+  id: null,
   role: 'admin',
   roleKey: 'admin',
+  backendRole: 'ADMIN',
+  rolId: 1,
   roleDisplayName: 'Académico: Admin',
   rbacLabel: 'Rol: Admin. académico',
   rbacBadge: 'RBAC: Académico',
-  name: 'Lu Bazaldúa',
-  email: 'lubazadmin@admin.uaq.mx',
-  position: 'Coordinador de Software',
-  credentialStatus: 'Credencial Activa',
+  name: 'Administrador',
+  email: 'Sin sesión activa',
+  position: 'Administrador Académico',
+  credentialStatus: 'Sin conexión',
   photoUrl: null,
-  permissions: ['flight:view', 'flight:schedule', 'flight:audit', 'geofence:edit', 'users:read', 'settings:edit'],
-  token: 'simulated_jwt_token_admin',
+  permissions: ['flight:view', 'flight:schedule', 'flight:audit', 'geofence:edit', 'users:write', 'settings:edit'],
+  token: null,
 }
 
 export const DEFAULT_GUARD_USER = {
-  id: 'usr-guard-01',
+  id: null,
   role: 'guard',
   roleKey: 'guard',
+  backendRole: 'GUARDIA',
+  rolId: 2,
   roleDisplayName: 'Seguridad: Guardia',
-  rbacLabel: 'Rol: Guardia de Seguridad (Supervisor)',
+  rbacLabel: 'Rol: Guardia de Seguridad',
   rbacBadge: 'RBAC: Seguridad',
-  name: 'NombreGuardia',
-  email: 'guard.seguridad@admin.uaq.mx',
-  position: 'Guardia Supervisor',
-  credentialStatus: 'Credencial Activa',
+  name: 'Guardia Operativo',
+  email: 'Sin sesión activa',
+  position: 'Guardia de Seguridad',
+  credentialStatus: 'Sin conexión',
   photoUrl: null,
   permissions: ['flight:view', 'flight:control_emergency', 'alerts:resolve'],
-  token: 'simulated_jwt_token_guard',
+  token: null,
 }
 
 /**
- * Obtiene el usuario autenticado actualmente desde el almacenamiento local o sesión predeterminada.
+ * Transforma UserResponse del backend ({id, nombre, email, activo, rol, created_at})
+ * al formato de sesión consumido por las vistas Admin y Guardia.
+ */
+export function mapBackendUserToSession(profile, token, previousSession = null) {
+  const backendRoleName = profile?.rol?.nombre || 'GUARDIA'
+  const mappedRole = normalizeRole(backendRoleName)
+  const isAdmin = mappedRole === 'admin'
+  const sameUser = previousSession && String(previousSession.email).toLowerCase() === String(profile?.email).toLowerCase()
+
+  return {
+    id: profile.id,
+    role: mappedRole,
+    roleKey: mappedRole,
+    backendRole: backendRoleName,
+    rolId: profile?.rol?.id ?? (isAdmin ? 1 : 2),
+    roleDisplayName: isAdmin ? 'Académico: Admin' : 'Seguridad: Guardia',
+    rbacLabel: isAdmin ? 'Rol: Admin. académico' : 'Rol: Guardia de Seguridad',
+    rbacBadge: isAdmin ? 'RBAC: Académico' : 'RBAC: Seguridad',
+    name: profile.nombre,
+    email: profile.email,
+    activo: Boolean(profile.activo),
+    position:
+      (sameUser && previousSession?.customPosition) ||
+      profile?.rol?.descripcion ||
+      (isAdmin ? 'Administrador Académico' : 'Guardia de Seguridad'),
+    customPosition: sameUser ? previousSession?.customPosition || null : null,
+    credentialStatus: profile.activo ? 'Credencial Activa' : 'Cuenta Inactiva',
+    photoUrl: sameUser ? previousSession?.photoUrl || null : null,
+    permissions: isAdmin
+      ? ['flight:view', 'flight:schedule', 'flight:audit', 'geofence:edit', 'users:write', 'settings:edit']
+      : ['flight:view', 'flight:control_emergency', 'alerts:resolve'],
+    createdAt: profile.created_at,
+    token,
+  }
+}
+
+function upsertKnownUser(userProfile) {
+  if (typeof window === 'undefined' || !userProfile?.email) return
+  try {
+    const users = getRegisteredUsers()
+    const normalizedEmail = String(userProfile.email).toLowerCase()
+    const mappedRole = normalizeRole(userProfile?.rol?.nombre || userProfile?.role)
+    const entry = {
+      id: userProfile.id,
+      name: userProfile.nombre || userProfile.name,
+      nombre: userProfile.nombre || userProfile.name,
+      email: userProfile.email,
+      activo: userProfile.activo ?? true,
+      role: mappedRole,
+      rolId: userProfile?.rol?.id ?? (mappedRole === 'admin' ? 1 : 2),
+      rolNombre: userProfile?.rol?.nombre || (mappedRole === 'admin' ? 'ADMIN' : 'GUARDIA'),
+      rolDescripcion:
+        userProfile?.rol?.descripcion ||
+        (mappedRole === 'admin' ? 'Administrador del sistema' : 'Guardia de seguridad de la facultad'),
+      createdAt: userProfile.created_at || userProfile.createdAt || new Date().toISOString(),
+    }
+
+    const existingIdx = users.findIndex((u) => String(u.email).toLowerCase() === normalizedEmail)
+    if (existingIdx >= 0) {
+      users[existingIdx] = { ...users[existingIdx], ...entry }
+    } else {
+      users.unshift(entry)
+    }
+    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users))
+    window.dispatchEvent(new CustomEvent('aeroluferan_users_changed', { detail: users }))
+  } catch (error) {
+    console.error('Error al sincronizar directorio local de usuarios:', error)
+  }
+}
+
+/**
+ * Retorna la sesión autenticada real (con JWT válido) o null si no ha iniciado sesión.
+ */
+export function getAuthenticatedUser() {
+  return getStoredSession()
+}
+
+export function isAuthenticated() {
+  return Boolean(getStoredSession()?.token)
+}
+
+/**
+ * Obtiene el usuario autenticado actualmente o una estructura vacía segura para renderizado.
  */
 export function getCurrentUser() {
-  try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (parsed && parsed.role) {
-        return parsed
-      }
-    }
-  } catch (error) {
-    console.error('Error al recuperar sesión de usuario:', error)
+  const session = getStoredSession()
+  if (session && session.role) {
+    return session
   }
-  // Si no hay sesión previa, iniciar con el usuario de la captura de Figma (Académico: Admin)
   return DEFAULT_ADMIN_USER
 }
 
 /**
- * Establece el usuario autenticado.
+ * Establece el usuario autenticado en localStorage.
  */
 export function setCurrentUser(user) {
   try {
@@ -69,24 +155,72 @@ export function setCurrentUser(user) {
 }
 
 /**
- * Actualiza los datos de perfil del usuario garantizando que el correo no sea modificado.
- * Preparado para emitir llamadas a la API del backend / base de datos.
+ * Inicia sesión real contra POST /auth/login y obtiene el perfil real con GET /auth/me.
  */
-export function updateUserProfile(updates) {
-  const current = getCurrentUser()
-  // El correo NO debe ser editable según la regla de negocio solicitada
-  const { email, ...allowedUpdates } = updates
-  const updated = {
-    ...current,
-    ...allowedUpdates,
-    email: current.email, // Mantiene estrictamente el correo institucional original
+export async function loginUser({ email, password }) {
+  const cleanEmail = String(email || '').trim()
+  const tokenResp = await apiClient.post(
+    '/auth/login',
+    { email: cleanEmail, password },
+    { auth: false, skipAuthRedirect: true },
+  )
+
+  const accessToken = tokenResp?.access_token
+  if (!accessToken) {
+    throw new Error('El servidor no devolvió un token de acceso válido.')
   }
+
+  const profile = await apiClient.get('/auth/me', {
+    token: accessToken,
+    skipAuthRedirect: true,
+  })
+
+  const previous = getStoredSession()
+  const sessionUser = mapBackendUserToSession(profile, accessToken, previous)
+  setCurrentUser(sessionUser)
+  upsertKnownUser(profile)
+  return sessionUser
+}
+
+/**
+ * Refresca los datos de la sesión activa consultando GET /auth/me.
+ */
+export async function fetchCurrentUser() {
+  const current = getStoredSession()
+  if (!current?.token) return null
+
+  const profile = await apiClient.get('/auth/me')
+  const updated = mapBackendUserToSession(profile, current.token, current)
   setCurrentUser(updated)
+  upsertKnownUser(profile)
   return updated
 }
 
 /**
- * Cierra la sesión activa y limpia los datos de autenticación.
+ * Actualiza metadatos locales de visualización de perfil (foto o cargo local)
+ * preservando el correo institucional y token JWT.
+ */
+export function updateUserProfile(updates) {
+  const current = getCurrentUser()
+  const allowedUpdates = { ...updates }
+  delete allowedUpdates.email
+  delete allowedUpdates.token
+  delete allowedUpdates.role
+
+  const updated = {
+    ...current,
+    ...allowedUpdates,
+    customPosition: allowedUpdates.position ?? current.customPosition ?? null,
+    email: current.email,
+  }
+  if (current.token) {
+    setCurrentUser(updated)
+  }
+  return updated
+}
+
+/**
+ * Cierra la sesión activa y limpia aeroluferan_session.
  */
 export function logoutUser() {
   try {
@@ -97,12 +231,13 @@ export function logoutUser() {
   }
 }
 
-export const REGISTERED_USERS_KEY = 'aeroluferan_registered_users'
-
 export function getRegisteredUsers() {
   try {
     const raw = localStorage.getItem(REGISTERED_USERS_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    }
   } catch (error) {
     console.error('Error al leer usuarios registrados:', error)
   }
@@ -110,41 +245,26 @@ export function getRegisteredUsers() {
 }
 
 /**
- * Registra una nueva cuenta institucional ("guard" o "admin").
- * Rechaza correos personales y almacena la sesión para la interfaz y futura BD.
+ * Registra un nuevo usuario en el backend vía POST /auth/register (requiere rol ADMIN).
+ * rol_id: 1 = ADMIN, 2 = GUARDIA. No reemplaza la sesión activa del administrador.
  */
-export function registerUser({ name, email, password, role }) {
-  const personalDomains = ['gmail.com', 'hotmail.com', 'yahoo.com', 'outlook.com', 'live.com', 'icloud.com']
-  const domain = email.split('@')[1]?.toLowerCase()
-  if (personalDomains.includes(domain)) {
-    throw new Error('Solo se permiten correos institucionales (@admin.uaq.mx o dominio universitario). No se permiten correos personales.')
-  }
+export async function registerUser({ nombre, name, email, password, role, rol_id }) {
+  const finalName = String(nombre ?? name ?? '').trim()
+  const finalEmail = String(email ?? '').trim().toLowerCase()
+  const resolvedRoleId =
+    rol_id !== undefined && rol_id !== null
+      ? Number(rol_id)
+      : normalizeRole(role) === 'admin'
+        ? 1
+        : 2
 
-  const newUser = {
-    id: `usr-${Date.now()}`,
-    role: role || 'guard',
-    roleKey: role || 'guard',
-    roleDisplayName: role === 'admin' ? 'Académico: Admin' : 'Seguridad: Guardia',
-    rbacLabel: role === 'admin' ? 'Rol: Admin. académico' : 'Rol: Guardia de Seguridad (Supervisor)',
-    rbacBadge: role === 'admin' ? 'RBAC: Académico' : 'RBAC: Seguridad',
-    name: name.trim(),
-    email: email.trim().toLowerCase(),
-    position: role === 'admin' ? 'Coordinador de Software' : 'Guardia Supervisor',
-    credentialStatus: 'Credencial Activa',
-    photoUrl: null,
-    createdAt: new Date().toISOString(),
-  }
+  const created = await apiClient.post('/auth/register', {
+    nombre: finalName,
+    email: finalEmail,
+    password,
+    rol_id: resolvedRoleId,
+  })
 
-  // Guardar en repositorio de usuarios
-  const users = getRegisteredUsers()
-  users.push(newUser)
-  try {
-    localStorage.setItem(REGISTERED_USERS_KEY, JSON.stringify(users))
-  } catch (error) {
-    console.error('Error al guardar nuevo usuario:', error)
-  }
-
-  // Activar sesión inmediata del usuario registrado
-  setCurrentUser(newUser)
-  return newUser
+  upsertKnownUser(created)
+  return created
 }

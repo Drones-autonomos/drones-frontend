@@ -1,21 +1,18 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import brandLogo from '../../assets/aeroluferan-logo.png'
-import {
-  DEFAULT_ADMIN_USER,
-  DEFAULT_GUARD_USER,
-  setCurrentUser,
-} from '../Admin/authSession.js'
+import { getAuthenticatedUser, loginUser } from '../Admin/authSession.js'
+import { normalizeRole } from '../../services/alertService.js'
 import './Login.css'
 
 const accountTypes = {
   guard: {
     label: 'Guardia Operativo',
-    email: 'guard.seguridad@admin.uaq.mx',
+    placeholder: 'guardia@uaq.mx',
   },
   admin: {
     label: 'Administrador Académico',
-    email: 'admin.academico@admin.uaq.mx',
+    placeholder: 'admin@uaq.mx',
   },
 }
 
@@ -81,42 +78,68 @@ function EyeIcon({ visible }) {
 
 function Login() {
   const navigate = useNavigate()
-  // Ningún tipo de usuario seleccionado inicialmente
   const [accountType, setAccountType] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Selección del tipo de usuario (únicamente una opción a la vez, sin navegar inmediatamente)
+  useEffect(() => {
+    const existing = getAuthenticatedUser()
+    if (existing?.token) {
+      const role = normalizeRole(existing.role || existing.backendRole)
+      navigate(role === 'admin' ? '/admin/en-vivo' : '/guardia/en-vivo', { replace: true })
+    }
+  }, [navigate])
+
   function selectAccount(type) {
     setAccountType(type)
     setErrorMessage('')
-    setEmail(accountTypes[type].email)
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
+    if (isSubmitting) return
 
-    // Validación obligatoria: si ninguna opción está seleccionada, bloquear avance y mostrar mensaje
-    if (!accountType) {
-      setErrorMessage(
-        'Es necesario seleccionar un tipo de usuario (Seguridad: Guardia o Académico: Admin) para iniciar sesión.',
-      )
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setErrorMessage('Ingresa tu correo electrónico institucional para iniciar sesión.')
+      return
+    }
+
+    if (!password || password.length < 6) {
+      setErrorMessage('Ingresa tu contraseña (mínimo 6 caracteres).')
       return
     }
 
     setErrorMessage('')
+    setIsSubmitting(true)
 
-    // Establecer usuario autenticado según el rol seleccionado
-    if (accountType === 'guard') {
-      const user = { ...DEFAULT_GUARD_USER, email: email || accountTypes.guard.email }
-      setCurrentUser(user)
-      navigate('/guardia/en-vivo')
-    } else if (accountType === 'admin') {
-      const user = { ...DEFAULT_ADMIN_USER, email: email || accountTypes.admin.email }
-      setCurrentUser(user)
-      navigate('/admin/en-vivo')
+    try {
+      const sessionUser = await loginUser({
+        email: trimmedEmail,
+        password,
+      })
+
+      const realRole = normalizeRole(sessionUser.role || sessionUser.backendRole)
+      if (realRole === 'admin') {
+        navigate('/admin/en-vivo', { replace: true })
+      } else {
+        navigate('/guardia/en-vivo', { replace: true })
+      }
+    } catch (error) {
+      if (error?.isOffline) {
+        setErrorMessage(
+          'Sin conexión con el servidor. Verifica que la API del backend esté en ejecución.',
+        )
+      } else {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'No fue posible iniciar sesión.',
+        )
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -176,7 +199,7 @@ function Login() {
           <label className="field-label" htmlFor="institutional-email">
             <span>Correo Institucional</span>
             <span className="account-label">
-              {accountType ? accountTypes[accountType].label : 'Selecciona una cuenta'}
+              {accountType ? accountTypes[accountType].label : 'Acceso autenticado'}
             </span>
           </label>
           <div className="input-shell">
@@ -189,14 +212,19 @@ function Login() {
                 setEmail(event.target.value)
                 setErrorMessage('')
               }}
-              placeholder={accountType ? accountTypes[accountType].email : 'nombre.apellido@admin.uaq.mx'}
+              placeholder={
+                accountType
+                  ? accountTypes[accountType].placeholder
+                  : 'nombre.apellido@uaq.mx'
+              }
               autoComplete="username"
+              disabled={isSubmitting}
             />
           </div>
 
           <label className="field-label password-label" htmlFor="password">
             <span>Contraseña</span>
-            <span className="field-link">¿Ayuda con PIN?</span>
+            <span className="field-link">JWT · 8h</span>
           </label>
           <div className="input-shell">
             <LockIcon />
@@ -204,9 +232,13 @@ function Login() {
               id="password"
               type={showPassword ? 'text' : 'password'}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value)
+                setErrorMessage('')
+              }}
               placeholder="••••••••••••"
               autoComplete="current-password"
+              disabled={isSubmitting}
             />
             <button
               className="password-toggle"
@@ -219,11 +251,11 @@ function Login() {
             </button>
           </div>
 
-          <button className="login-submit" type="submit">
-            Iniciar Sesión
+          <button className="login-submit" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
           <p className="register-prompt">
-            ¿No tienes una cuenta? <Link to="/registro">Regístrate aquí</Link>
+            El alta de nuevas cuentas está reservada al Administrador Académico.
           </p>
         </form>
       </div>

@@ -21,7 +21,6 @@ import {
 import { getCurrentUser, logoutUser, updateUserProfile } from './authSession.js'
 import {
   AI_SENSITIVITY_OPTIONS,
-  DEFAULT_SETTINGS,
   generateAuditExportFile,
   getStoredSettings,
   RETENTION_PERIOD_OPTIONS,
@@ -37,22 +36,11 @@ export default function Ajustes({ initialView = 'main' }) {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Determinar si la vista inicial es "Editar perfil" según prop o ruta
-  const [view, setView] = useState(() => {
-    if (initialView === 'editProfile' || location.pathname.includes('/perfil')) {
-      return 'editProfile'
-    }
-    return 'main'
-  })
-
-  // Sincronizar con cambios de ruta si se navega directamente
-  useEffect(() => {
-    if (location.pathname.includes('/perfil')) {
-      setView('editProfile')
-    } else {
-      setView('main')
-    }
-  }, [location.pathname])
+  // Determinar si la vista activa es "Editar perfil" según prop o ruta
+  const view =
+    initialView === 'editProfile' || location.pathname.includes('/perfil')
+      ? 'editProfile'
+      : 'main'
 
   // 1. Estado de usuario autenticado
   const [currentUser, setCurrentUser] = useState(getCurrentUser)
@@ -167,13 +155,11 @@ export default function Ajustes({ initialView = 'main' }) {
 
   // Navegar a edición de perfil
   function handleOpenEditProfile() {
-    setView('editProfile')
     navigate('/admin/ajustes/perfil')
   }
 
   // Volver a vista principal de ajustes
   function handleBackToAjustes() {
-    setView('main')
     navigate('/admin/ajustes')
   }
 
@@ -390,6 +376,34 @@ export default function Ajustes({ initialView = 'main' }) {
             {/* B. SEGURIDAD & CONTROL OPERATIVO */}
             <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
             <section className="ajustes-group-card" aria-label="Seguridad y control operativo">
+              {/* Gestión de Usuarios Institucionales (Solo Admin -> POST /auth/register) */}
+              <div
+                className="ajustes-item-row"
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate('/admin/usuarios')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') navigate('/admin/usuarios')
+                }}
+              >
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--blue" aria-hidden="true">
+                    <UserVerifiedBadgeIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Gestión de Usuarios</strong>
+                    <p className="ajustes-item__subtitle">
+                      Registrar nuevas cuentas de Administrador o Guardia
+                    </p>
+                  </div>
+                </div>
+
+                <span className="btn-action-circle" aria-hidden="true">
+                  <ChevronRightIcon size={16} />
+                </span>
+              </div>
+
               {/* Alertas Push Críticas */}
               <div className="ajustes-item-row">
                 <div className="ajustes-item__left">
