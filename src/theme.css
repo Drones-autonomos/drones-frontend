@@ -166,30 +166,34 @@
   color: var(--dark-text);
 }
 
-/* --- Textos --- */
-[data-theme='dark'] h1,
-[data-theme='dark'] h2,
-[data-theme='dark'] h3,
-[data-theme='dark'] h4,
-[data-theme='dark'] strong,
-[data-theme='dark'] label,
-[data-theme='dark'] .rutas-brand-title,
-[data-theme='dark'] .ajustes-brand-title,
-[data-theme='dark'] .bitacora-brand-title,
-[data-theme='dark'] .programar-brand-name,
-[data-theme='dark'] .live-header__brand-copy h1 {
+/* --- Textos (body sube especificidad sobre clases de un nivel) --- */
+[data-theme='dark'] body h1,
+[data-theme='dark'] body h2,
+[data-theme='dark'] body h3,
+[data-theme='dark'] body h4,
+[data-theme='dark'] body strong,
+[data-theme='dark'] body label {
   color: var(--dark-text);
 }
 
-[data-theme='dark'] p,
-[data-theme='dark'] span,
-[data-theme='dark'] small,
-[data-theme='dark'] li,
-[data-theme='dark'] td,
-[data-theme='dark'] .geofence-item-desc,
-[data-theme='dark'] .geofence-item-coords,
-[data-theme='dark'] .metric-cell-label {
-  color: inherit;
+/* --- Flight card (misión activa) --- */
+[data-theme='dark'] .flight-card__icon {
+  background: rgb(56 189 248 / 15%);
+  color: var(--dark-accent);
+}
+
+[data-theme='dark'] .flight-card__milestone {
+  background: var(--dark-surface-2);
+  border: 1px solid var(--dark-border);
+  color: var(--dark-text-muted);
+}
+
+[data-theme='dark'] body .flight-card__milestone strong {
+  color: var(--dark-accent);
+}
+
+[data-theme='dark'] .flight-card__eyebrow {
+  color: var(--dark-accent);
 }
 
 [data-theme='dark'] .rutas-brand-subtitle span,
