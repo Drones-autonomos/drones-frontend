@@ -1,4 +1,14 @@
 <!doctype html>
+<script>
+  // Aplica el tema persistido antes del primer paint (anti-FOUC).
+  try {
+    var t = localStorage.getItem('aeroluferan_theme')
+    if (t !== 'dark' && t !== 'light') {
+      t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+    document.documentElement.dataset.theme = t
+  } catch (e) {}
+</script>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { logoutUser } from '../pages/Admin/authSession.js'
+import { getTheme, toggleTheme, THEME_CHANGED_EVENT } from '../services/themeService.js'
 import './UserAvatarMenu.css'
 
 /**
@@ -13,7 +14,17 @@ import './UserAvatarMenu.css'
 export default function UserAvatarMenu({ session }) {
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
+  const [theme, setThemeState] = useState(getTheme)
   const rootRef = useRef(null)
+
+  // Reacciona a cambios de tema hechos desde otras vistas/componentes.
+  useEffect(() => {
+    function syncTheme() {
+      setThemeState(getTheme())
+    }
+    window.addEventListener(THEME_CHANGED_EVENT, syncTheme)
+    return () => window.removeEventListener(THEME_CHANGED_EVENT, syncTheme)
+  }, [])
 
   // Cierre al hacer clic fuera del componente o pulsar Escape.
   useEffect(() => {
@@ -114,6 +125,19 @@ export default function UserAvatarMenu({ session }) {
               </li>
             )}
           </ul>
+
+          <button
+            type="button"
+            className="theme-toggle-row"
+            role="switch"
+            aria-checked={theme === 'dark'}
+            onClick={() => toggleTheme()}
+          >
+            <span className="theme-toggle-label">Modo oscuro</span>
+            <span className="theme-toggle-track" aria-hidden="true">
+              <span className={`theme-toggle-thumb${theme === 'dark' ? ' is-on' : ''}`} />
+            </span>
+          </button>
 
           <button type="button" className="user-logout-btn" onClick={handleLogout}>
             Cerrar sesión

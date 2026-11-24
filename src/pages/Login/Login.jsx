@@ -3,17 +3,27 @@ import { useNavigate } from 'react-router-dom'
 import brandLogo from '../../assets/aeroluferan-logo.png'
 import { getAuthenticatedUser, loginUser } from '../Admin/authSession.js'
 import { normalizeRole } from '../../services/alertService.js'
+import { getTheme, toggleTheme, THEME_CHANGED_EVENT } from '../../services/themeService.js'
 import './Login.css'
 
 const accountTypes = {
   guard: {
     label: 'Guardia Operativo',
-    placeholder: 'guardia@uaq.mx',
+    placeholder: 'seguridad@uaq.mx',
+    backendRole: 'GUARDIA',
   },
   admin: {
     label: 'Administrador Académico',
-    placeholder: 'admin@uaq.mx',
+    placeholder: 'academico@uaq.mx',
+    backendRole: 'ADMIN',
   },
+}
+
+// Cuentas de prueba (existen en el backend). Solo en modo dev la tarjeta de
+// rol autocompleta credenciales y "Iniciar Sesión" vacío usa estas cuentas.
+const TEST_CREDENTIALS = {
+  guard: { email: 'seguridad@uaq.mx', password: 'seguridad' },
+  admin: { email: 'academico@uaq.mx', password: 'academico' },
 }
 
 function BrandMark() {
@@ -84,6 +94,15 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [theme, setTheme] = useState(getTheme)
+
+  useEffect(() => {
+    function syncTheme() {
+      setTheme(getTheme())
+    }
+    window.addEventListener(THEME_CHANGED_EVENT, syncTheme)
+    return () => window.removeEventListener(THEME_CHANGED_EVENT, syncTheme)
+  }, [])
 
   useEffect(() => {
     const existing = getAuthenticatedUser()
@@ -96,19 +115,33 @@ function Login() {
   function selectAccount(type) {
     setAccountType(type)
     setErrorMessage('')
+    if (import.meta.env.DEV) {
+      setEmail(TEST_CREDENTIALS[type].email)
+      setPassword(TEST_CREDENTIALS[type].password)
+    }
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
     if (isSubmitting) return
 
-    const trimmedEmail = email.trim()
+    let trimmedEmail = email.trim()
+    let pass = password
+
+    // Dev: Enter sin campos → entra con la cuenta de prueba del rol elegido
+    // (o Admin si no se seleccionó tarjeta).
+    if (import.meta.env.DEV && !trimmedEmail && !pass) {
+      const creds = TEST_CREDENTIALS[accountType || 'admin']
+      trimmedEmail = creds.email
+      pass = creds.password
+    }
+
     if (!trimmedEmail) {
       setErrorMessage('Ingresa tu correo electrónico institucional para iniciar sesión.')
       return
     }
 
-    if (!password || password.length < 6) {
+    if (!pass || pass.length < 6) {
       setErrorMessage('Ingresa tu contraseña (mínimo 6 caracteres).')
       return
     }
@@ -119,7 +152,8 @@ function Login() {
     try {
       const sessionUser = await loginUser({
         email: trimmedEmail,
-        password,
+        password: pass,
+        expectedRole: accountType ? accountTypes[accountType].backendRole : undefined,
       })
 
       const realRole = normalizeRole(sessionUser.role || sessionUser.backendRole)
@@ -145,6 +179,15 @@ function Login() {
 
   return (
     <main className="login-page">
+      <button
+        type="button"
+        className="login-theme-toggle"
+        aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+        onClick={() => toggleTheme()}
+      >
+        {theme === 'dark' ? '☀' : '☾'}
+      </button>
       <div className="login-content">
         <header className="login-header">
           <BrandMark />
@@ -254,6 +297,11 @@ function Login() {
           <button className="login-submit" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
+          {import.meta.env.DEV && (
+            <p className="register-prompt">
+              Pruebas: seguridad@uaq.mx / seguridad · academico@uaq.mx / academico
+            </p>
+          )}
           <p className="register-prompt">
             El alta de nuevas cuentas está reservada al Administrador Académico.
           </p>

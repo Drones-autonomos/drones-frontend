@@ -168,3 +168,61 @@
   outline: 2px solid #dc2626;
   outline-offset: 2px;
 }
+
+/* --- Fila: toggle de modo oscuro --- */
+.theme-toggle-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 4px 0 8px;
+  border: none;
+  border-top: 1px solid #eef0fa;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #172f52;
+}
+
+.theme-toggle-label {
+  color: inherit;
+}
+
+.theme-toggle-track {
+  position: relative;
+  width: 38px;
+  height: 20px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.theme-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  transition: transform 0.2s ease;
+}
+
+.theme-toggle-row[aria-checked='true'] .theme-toggle-track {
+  background: #0284c7;
+}
+
+.theme-toggle-thumb.is-on {
+  transform: translateX(18px);
+}
+
+.theme-toggle-row:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+  border-radius: 8px;
+}

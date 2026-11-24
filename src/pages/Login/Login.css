@@ -502,3 +502,166 @@
   border-radius: 50%;
   background: #e11d48;
 }
+
+/* ============================================================== */
+/* Escritorio (≥1024px): versión compacta para ver todo el login  */
+/* sin hacer scroll (equivalente a un zoom-out del diseño móvil)  */
+/* ============================================================== */
+@media (min-width: 1024px) {
+  .login-page {
+    gap: 16px;
+    padding: 18px 20px;
+  }
+
+  .login-content {
+    width: min(100%, 470px);
+  }
+
+  .login-header {
+    margin-bottom: 14px;
+  }
+
+  .login-brand-mark {
+    width: 92px;
+    min-width: 0;
+    margin-bottom: 8px;
+  }
+
+  .login-brand-name h1 {
+    font-size: 30px;
+    letter-spacing: -1px;
+  }
+
+  .login-brand-badge {
+    min-width: 46px;
+    height: 32px;
+    padding: 0 9px;
+    font-size: 15px;
+  }
+
+  .account-section h2 {
+    margin-bottom: 10px;
+    font-size: 15px;
+  }
+
+  .account-options {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .account-option {
+    min-height: 78px;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 22px;
+  }
+
+  .account-option.is-selected {
+    padding: 10px 14px;
+  }
+
+  .account-icon {
+    width: 52px;
+    height: 52px;
+    flex-basis: 52px;
+    border-radius: 16px;
+  }
+
+  .account-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .account-option-copy strong {
+    font-size: 15px;
+  }
+
+  .account-option-copy > span {
+    font-size: 14px;
+  }
+
+  .login-form {
+    padding: 18px 22px 16px;
+    border-radius: 32px;
+  }
+
+  .field-label {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .input-shell {
+    min-height: 54px;
+    gap: 12px;
+    padding: 0 16px;
+    border-radius: 18px;
+  }
+
+  .input-shell > svg {
+    width: 20px;
+    height: 20px;
+    flex-basis: 20px;
+  }
+
+  .input-shell input {
+    font-size: 15px;
+  }
+
+  .password-label {
+    margin-top: 16px;
+  }
+
+  .password-toggle svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .login-submit {
+    min-height: 50px;
+    margin-top: 16px;
+    font-size: 17px;
+  }
+
+  .register-prompt {
+    margin-top: 12px;
+    font-size: 13px;
+  }
+
+  .login-footer {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .login-error-alert {
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+}
+
+/* --- Toggle de modo oscuro (flotante, esquina superior derecha) --- */
+.login-theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1100;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #e8eaff;
+  background: #ffffff;
+  color: #172f52;
+  font-size: 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgb(23 47 82 / 18%);
+  transition: background 0.2s ease;
+}
+
+.login-theme-toggle:hover {
+  background: #f1f5f9;
+}
+
+.login-theme-toggle:focus-visible {
+  outline: 2px solid #0284c7;
+  outline-offset: 2px;
+}
