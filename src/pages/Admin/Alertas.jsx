@@ -45,7 +45,7 @@ function Alertas() {
 
   const handleDispatchGuard = (alert) => {
     dispatchGuard(alert.id)
-    setLastAction(`Solicitud de guardia registrada localmente para ${alert.droneName}.`)
+    setLastAction(`Solicitud de despacho registrada para ${alert.droneName}.`)
   }
 
   const handleDismiss = (alertId) => {

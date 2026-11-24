@@ -21,8 +21,8 @@ import {
 import RutasMap from './RutasMap.jsx'
 import { GeofenceManagerModal, NewZoneDialog } from './GeofenceManagerModal.jsx'
 import {
-  initialDroneCommState,
-  initialPreflightData,
+  PREFLIGHT_BASE,
+  deriveOperatingCeiling,
   getStoredAutonomous,
   saveAutonomous,
   getStoredGeofences,
@@ -53,7 +53,8 @@ export default function Rutas() {
   // 1. Estado de comunicación del dron derivado de la telemetría real del backend
   const droneLink = telemetry?.link || {}
   const droneComm = {
-    ...initialDroneCommState,
+    droneName: telemetry?.drone?.name || 'AeroLuferan',
+    model: telemetry?.drone?.model || '—',
     isConnected: Boolean(droneLink.droneConnected),
     signalQuality: telemetry?.drone?.signalPercentage ?? 0,
     status: droneLink.droneConnected ? 'online' : 'disconnected',
@@ -129,19 +130,31 @@ export default function Rutas() {
   const telemetryCards = telemetry?.cards || []
   const batteryCard = telemetryCards.find((c) => c.id === 'battery')
   const droneConnected = Boolean(droneLink.droneConnected)
+  const operatingCeiling = deriveOperatingCeiling(geofences)
   const preflight = {
-    ...initialPreflightData,
+    ...PREFLIGHT_BASE,
     overallStatus: droneConnected ? 'Todo Listo' : 'Sin enlace',
     isReady: droneConnected,
+    operatingCeiling: {
+      ...PREFLIGHT_BASE.operatingCeiling,
+      height: operatingCeiling != null ? `${operatingCeiling}m AGL` : '—',
+      complianceText:
+        operatingCeiling == null
+          ? 'SIN ZONA ACTIVA'
+          : operatingCeiling <= 200
+            ? 'CUMPLE NORMATIVA'
+            : 'EXCEDE NORMATIVA',
+      isCompliant: operatingCeiling != null ? operatingCeiling <= 200 : null,
+    },
     metrics: {
-      wind: { ...initialPreflightData.metrics.wind, value: '—', statusLabel: 'Sin datos', statusType: 'success' },
+      wind: { ...PREFLIGHT_BASE.metrics.wind },
       battery: {
-        ...initialPreflightData.metrics.battery,
+        ...PREFLIGHT_BASE.metrics.battery,
         value: batteryCard?.value ?? '—',
         statusLabel: droneConnected ? 'Telemetría real' : 'Sin datos',
       },
       rfSignal: {
-        ...initialPreflightData.metrics.rfSignal,
+        ...PREFLIGHT_BASE.metrics.rfSignal,
         value: droneConnected ? `${droneComm.signalQuality}%` : 'Sin enlace',
         statusLabel: droneConnected ? 'En línea' : 'Desconectado',
       },
@@ -522,6 +535,7 @@ export default function Rutas() {
               <RutasMap
                 geofences={geofences}
                 selectedRoute={selectedMission}
+                missionRoutes={missions}
                 isDrawingMode={isDrawingMode}
                 onZoneCreated={handleZoneCreatedOnMap}
                 onCancelDrawing={() => setIsDrawingMode(false)}

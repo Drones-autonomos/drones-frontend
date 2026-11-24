@@ -151,7 +151,7 @@ export default function GuardiaAlertas() {
   const handleDispatch = (alert) => {
     dispatchGuard(alert.id)
     setStatusMessage(
-      `[Demostración] Solicitud de despacho registrada localmente para ${alert.droneName}. Estado actualizado a "En atención".`,
+      `Solicitud de despacho registrada para ${alert.droneName}. Estado actualizado a "En atención".`,
     )
   }
 
@@ -270,12 +270,12 @@ export default function GuardiaAlertas() {
             <button
               type="button"
               className="alertas-guardia-quick-toolbar__btn"
-              onClick={() => {
-                resetDemo()
-                setStatusMessage('Demostración reiniciada: 3 alertas nuevas cargadas.')
+              onClick={async () => {
+                await resetDemo()
+                setStatusMessage('Alertas sincronizadas desde el servidor.')
               }}
             >
-              Reiniciar demo
+              Sincronizar alertas
             </button>
           </div>
         </div>

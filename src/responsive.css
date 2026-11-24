@@ -263,19 +263,6 @@
   body .ajustes-modal-card {
     width: min(100%, 560px);
   }
-
-  /* Backdrops dentro del shell con zoom: su containing block es el
-     shell (no el viewport), así que se extienden hacia la izquierda
-     para atenuar también el sidebar y centrar el modal en toda la
-     ventana. El offset se divide entre el factor de zoom.
-     Acotado por ancestro: los modales renderizados fuera del shell
-     (p. ej. Bitácora) ya usan el viewport y no reciben offset. */
-  body .rutas-shell .geofence-modal-overlay,
-  body .programar-ruta-shell .programar-modal-backdrop,
-  body .bitacora-shell .bitacora-modal-backdrop,
-  body .ajustes-shell .ajustes-modal-backdrop {
-    left: calc(-236px / 1.15);
-  }
 }
 
 /* ==========================================================================
@@ -336,13 +323,6 @@ body .emergency-modal-backdrop {
 
   body .vuelos-programados-section > .vuelos-cards-list {
     max-height: calc((100vh - 110px) / 1.25);
-  }
-
-  body .rutas-shell .geofence-modal-overlay,
-  body .programar-ruta-shell .programar-modal-backdrop,
-  body .bitacora-shell .bitacora-modal-backdrop,
-  body .ajustes-shell .ajustes-modal-backdrop {
-    left: calc(-236px / 1.25);
   }
 
   body .campus-map-box {

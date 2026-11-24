@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   CloseIcon,
   TrashIcon,
@@ -41,7 +42,7 @@ export function GeofenceManagerModal({
     setEditingZoneId(null)
   }
 
-  return (
+  return createPortal(
     <div className="geofence-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="geo-modal-title">
       <div className="geofence-modal-card">
         <header className="geofence-modal-header">
@@ -78,6 +79,16 @@ export function GeofenceManagerModal({
           <h3 className="geofence-list-heading">Zonas Registradas ({geofences.length})</h3>
 
           <ul className="geofence-list">
+            {geofences.length === 0 && (
+              <li className="geofence-item geofence-item--informativa">
+                <div className="geofence-item-main">
+                  <p className="geofence-item-desc">
+                    Sin zonas registradas. Las geocercas se cargan desde el backend;
+                    si la lista sigue vacía, verifica la conexión con el servidor.
+                  </p>
+                </div>
+              </li>
+            )}
             {geofences.map((zone) => {
               const isEditing = editingZoneId === zone.id
 
@@ -207,7 +218,8 @@ export function GeofenceManagerModal({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -238,7 +250,7 @@ export function NewZoneDialog({
     })
   }
 
-  return (
+  return createPortal(
     <div className="geofence-modal-overlay" role="dialog" aria-modal="true">
       <div className="geofence-modal-card geofence-modal-card--sm">
         <header className="geofence-modal-header">
@@ -301,6 +313,7 @@ export function NewZoneDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

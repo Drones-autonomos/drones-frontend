@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
 import {
@@ -17,20 +17,13 @@ import {
   HELIPUERTOS,
   calculatePathDistance,
   getStoredGeofences,
-  initialChecklistData,
   validateRouteAgainstGeofences,
 } from './rutasData.js'
 import { createMission, updateMission } from '../../services/missionService.js'
 import { validatePointAgainstGeofences } from '../../services/geofenceService.js'
+import { fetchPresetRoutes, getPresetRoutes } from './presetRoutes.js'
+import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
 import './ProgramarRuta.css'
-
-// Waypoints iniciales de demostración acordes al trayecto E2 -> A de la captura
-const INITIAL_DEMO_WAYPOINTS = [
-  [20.7046, -100.4447], // E2: Acceso Norte
-  [20.7042, -100.4437], // Coliseo
-  [20.7034, -100.4441], // Aulas
-  [20.7024, -100.4436], // A: Laboratorios / Zona Sur
-]
 
 const DAYS_OF_WEEK = [
   { id: 'lun', label: 'L', name: 'Lunes' },
@@ -65,15 +58,28 @@ export default function ProgramarRuta() {
     }
   }, [editMission])
 
-  // 1. Checklist de Vuelo Aprobado (datos de telemetría de demostración preparados para backend)
-  const [checklist] = useState(initialChecklistData)
+  // 1. Checklist de Vuelo Aprobado (telemetría real: batería y enlace)
+  const telemetry = useDroneTelemetry()
+  const batteryCard = telemetry?.cards?.find((c) => c.id === 'battery')
+  const droneConnected = Boolean(telemetry?.link?.droneConnected)
+  const checklist = {
+    isApproved: droneConnected,
+    batteryText: batteryCard?.value ?? '—',
+    linkText: droneConnected ? `${telemetry?.drone?.signalPercentage ?? 0}%` : 'Sin enlace',
+    transportText:
+      telemetry?.link?.transport === 'ws'
+        ? 'WS en vivo'
+        : telemetry?.link?.transport === 'polling'
+          ? 'REST'
+          : 'Sin enlace',
+  }
 
   // 2. Nombre de la misión
-  const [missionName, setMissionName] = useState(editMission?.name || 'Circuito Coliseo')
+  const [missionName, setMissionName] = useState(editMission?.name || '')
 
   // 3. Waypoints y mapa interactivo
   const [waypoints, setWaypoints] = useState(
-    editMission?.waypoints?.length >= 2 ? editMission.waypoints : INITIAL_DEMO_WAYPOINTS,
+    editMission?.waypoints?.length >= 2 ? editMission.waypoints : [],
   )
   const [geofences] = useState(getStoredGeofences)
 
@@ -97,6 +103,26 @@ export default function ProgramarRuta() {
   const [isRecurring, setIsRecurring] = useState(true)
   const [selectedDays, setSelectedDays] = useState(['lun', 'mar', 'mie', 'jue', 'vie'])
 
+  // Ruta preprogramada cargada en el mapa (null = ruta manual)
+  const [activePresetId, setActivePresetId] = useState(null)
+
+  // Rutas preprogramadas: arranca con el cache/fallback local y se repuebla
+  // desde GET /missions/presets cuando el backend está disponible.
+  const [presetRoutes, setPresetRoutes] = useState(getPresetRoutes)
+
+  useEffect(() => {
+    if (isEditMode) return undefined
+    let cancelled = false
+    fetchPresetRoutes().then((routes) => {
+      if (!cancelled && Array.isArray(routes) && routes.length > 0) {
+        setPresetRoutes(routes)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isEditMode])
+
   // Modales interactivos para configuración de vuelo
   const [activeConfigModal, setActiveConfigModal] = useState(null) // 'despegue' | 'aterrizaje' | 'frecuencia' | null
   const [formError, setFormError] = useState(null)
@@ -110,9 +136,8 @@ export default function ProgramarRuta() {
 
   // Distancia formateada con separador de miles: "1,420 m lineales de cobertura"
   const formattedDistance = useMemo(() => {
-    // Si la distancia calculada difiere ligeramente de la demo, usamos el cálculo real o aproximado
-    const meters = pathDistance > 0 ? pathDistance : 1420
-    return `${meters.toLocaleString('es-MX')} m lineales de cobertura`
+    if (pathDistance <= 0) return 'Sin trayectoria definida'
+    return `${pathDistance.toLocaleString('es-MX')} m lineales de cobertura`
   }, [pathDistance])
 
   // Identificador de primer y último waypoint
@@ -164,6 +189,15 @@ export default function ProgramarRuta() {
     if (!exclusionEnabled) return { conflicts: [], hasCriticalConflict: false }
     return validateRouteAgainstGeofences(waypoints, geofences)
   }, [waypoints, geofences, exclusionEnabled])
+
+  // Cargar una ruta de patrullaje preprogramada al mapa y al formulario
+  function applyPresetRoute(route) {
+    setWaypoints(route.waypoints)
+    setMissionName(route.nombre)
+    setOperatingHeight(route.altitudSugerida)
+    setActivePresetId(route.id)
+    setFormError(null)
+  }
 
   // Manejo de selección de días de la semana
   function toggleDay(dayId) {
@@ -303,16 +337,16 @@ export default function ProgramarRuta() {
                 <ShieldCheckIcon size={22} color="#10b981" />
               </span>
               <div className="checklist-copy">
-                <strong>Checklist de Vuelo Aprobado</strong>
+                <strong>{checklist.isApproved ? 'Checklist de Vuelo Aprobado' : 'Checklist de Vuelo'}</strong>
                 <p>
-                  Batería {checklist.batteryPercent}% • Viento {checklist.windKmH} km/h • RBAC {checklist.rbacStatus}
+                  Batería {checklist.batteryText} • Enlace {checklist.linkText}
                 </p>
               </div>
             </div>
 
-            <span className="checklist-latency-pill" title="Latencia del enlace RF">
-              <LightningBoltIcon size={12} color="#10b981" />
-              <span>{checklist.latencyMs}ms</span>
+            <span className="checklist-latency-pill" title="Canal de telemetría">
+              <LightningBoltIcon size={12} color={checklist.isApproved ? '#10b981' : '#94a3b8'} />
+              <span>{checklist.transportText}</span>
             </span>
           </section>
 
@@ -345,6 +379,36 @@ export default function ProgramarRuta() {
               )}
             </div>
           </section>
+
+          {/* ============================================================== */}
+          {/* RUTAS DE PATRULLAJE PREPROGRAMADAS (solo modo creación)        */}
+          {/* ============================================================== */}
+          {!isEditMode && (
+            <section className="preset-routes-card" aria-label="Rutas de patrullaje preprogramadas">
+              <div className="preset-routes-header">
+                <ForkRouteIcon size={18} color="#0284c7" />
+                <strong>Rutas preprogramadas</strong>
+              </div>
+              <div className="preset-routes-grid">
+                {presetRoutes.map((route) => (
+                  <button
+                    key={route.id}
+                    type="button"
+                    className={`preset-route-btn${activePresetId === route.id ? ' is-selected' : ''}`}
+                    onClick={() => applyPresetRoute(route)}
+                    title={route.descripcion}
+                  >
+                    <strong>{route.nombre}</strong>
+                    <span>{route.waypoints.length} waypoints · {route.altitudSugerida} m AGL</span>
+                  </button>
+                ))}
+              </div>
+              <p className="preset-routes-hint">
+                Carga el trayecto completo (traslado + barrido + regreso a base) en el
+                mapa; puedes ajustar waypoints, altura y horario antes de programar.
+              </p>
+            </section>
+          )}
 
           {/* ============================================================== */}
           {/* WAYPOINTS & TELEMETRÍA (Mapa interactivo y controles)          */}

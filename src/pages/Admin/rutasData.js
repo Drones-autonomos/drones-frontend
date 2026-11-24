@@ -12,215 +12,70 @@ export const HELIPUERTOS = [
   'Helipuerto Base Sur',
 ]
 
-export const MISSIONS_STORAGE_KEY = 'aeroluferan_missions'
 export const GEOFENCES_STORAGE_KEY = 'aeroluferan_geofences'
 
 /**
- * Checklist de Vuelo Aprobado (Demostración y preparación para telemetría real)
+ * Umbrales operativos de la verificación prevuelo (configuración del sistema,
+ * no datos de telemetría). Los valores mostrados provienen de la telemetría real.
  */
-export const initialChecklistData = {
-  batteryPercent: 92,
-  batteryMinRequired: 35,
-  windKmH: 4,
-  windMaxAllowed: 25,
-  rbacStatus: 'OK',
-  rbacAuthorized: true,
-  latencyMs: 18,
-  isApproved: true,
+export const PREFLIGHT_LIMITS = {
+  windMaxKmh: 25,
+  batteryMinPct: 35,
+  rfMinDbm: -85,
+  regulatoryCeilingM: 200,
 }
 
 /**
- * Zonas y geocercas predeterminadas (demostración fiel a la captura de Figma)
+ * Techo operativo derivado de las zonas autorizadas activas: la menor
+ * altitud máxima (AGL) entre ellas. null cuando no hay zonas activas.
  */
-export const initialGeofences = [
-  {
-    id: 'geo-e2',
-    name: 'Acceso Norte',
-    badgeCode: 'E2',
-    type: 'informativa', // 'informativa' | 'advertencia' | 'restringida'
-    color: '#0284c7',
-    bounds: [
-      [20.7042, -100.4449],
-      [20.7048, -100.4441],
-    ],
-    status: 'Activa',
-    description: 'Punto de control y acceso vehicular norte.',
-    restrictionReason: '',
-  },
-  {
-    id: 'geo-a1',
-    name: 'Aulas',
-    badgeCode: 'A1',
-    type: 'informativa',
-    color: '#0284c7',
-    bounds: [
-      [20.7032, -100.4448],
-      [20.7038, -100.4440],
-    ],
-    status: 'Activa',
-    description: 'Área académica de aulas y docencia.',
-    restrictionReason: '',
-  },
-  {
-    id: 'geo-alta-tension',
-    name: 'Alta Tensión',
-    badgeCode: 'Riesgo EM',
-    type: 'advertencia',
-    color: '#f59e0b',
-    bounds: [
-      [20.7041, -100.4437],
-      [20.7046, -100.4429],
-    ],
-    status: 'Precaución',
-    description: 'Líneas de media/alta tensión contiguas.',
-    restrictionReason: 'Riesgo de interferencia electromagnética (EM) en brújula y telemetría.',
-  },
-  {
-    id: 'geo-arcotecho',
-    name: 'Arcotecho',
-    badgeCode: 'Tope de altura',
-    type: 'restringida',
-    color: '#ef4444',
-    bounds: [
-      [20.7027, -100.4438],
-      [20.7032, -100.4430],
-    ],
-    status: 'Restringida',
-    description: 'Estructura metálica curva deportiva.',
-    restrictionReason: 'Tope de altura física (18m AGL) con riesgo de colisión estructural.',
-  },
-  {
-    id: 'geo-laboratorios',
-    name: 'Laboratorios',
-    badgeCode: 'L',
-    type: 'informativa',
-    color: '#0284c7',
-    bounds: [
-      [20.7018, -100.4442],
-      [20.7024, -100.4432],
-    ],
-    status: 'Activa',
-    description: 'Complejo de laboratorios especializados.',
-    restrictionReason: '',
-  },
-]
+export function deriveOperatingCeiling(geofences) {
+  const caps = (geofences || [])
+    .filter((z) => z.status === 'Activa' && Number.isFinite(z.altitudMax))
+    .map((z) => z.altitudMax)
+  return caps.length ? Math.min(...caps) : null
+}
 
 /**
- * Rutas de vuelo programadas predeterminadas
+ * Estructura base de la Verificación Prevuelo: solo etiquetas, umbrales
+ * (config) y placeholders. Los valores reales los inyecta la telemetría
+ * en Rutas.jsx — ningún dato aquí se presenta como medición.
  */
-export const initialScheduledMissions = [
-  {
-    id: 'm-matutino',
-    name: 'Circuito Matutino',
-    iconType: 'sun',
-    startTime: '07:00',
-    endTime: '07:35',
-    timeDisplay: '07:00 – 07:35 HRS',
-    zone: 'Zona Norte',
-    status: 'Próximo',
-    statusBadge: 'PRÓXIMO',
-    statusType: 'proximo',
-    duration: '35 min',
-    batteryRequired: '42% Batt',
-    opticalSensor: 'RGB 4K + IR',
-    sensorColor: 'blue',
-    droneId: 'Vanguard-01',
-    departureHelipad: 'Helipuerto Base Norte',
-    arrivalHelipad: 'Helipuerto Base Norte',
-    frequency: 'Lun → Vie',
-    patrolType: 'Patrullaje matutino',
-    operatingHeight: 60,
-    date: '2026-11-09',
-    waypoints: [
-      [20.7045, -100.4445],
-      [20.7043, -100.4433],
-      [20.7035, -100.4436],
-      [20.7035, -100.4445],
-      [20.7045, -100.4445],
-    ],
-  },
-  {
-    id: 'm-vespertino',
-    name: 'Circuito Vespertino',
-    iconType: 'moon',
-    startTime: '19:00',
-    endTime: '19:30',
-    timeDisplay: '19:00 – 19:30 HRS',
-    zone: 'Perímetro Total',
-    status: 'Agendado',
-    statusBadge: 'AGENDADO',
-    statusType: 'agendado',
-    duration: '30 min',
-    batteryRequired: '48% Batt',
-    opticalSensor: 'Térmica FLIR',
-    sensorColor: 'purple',
-    droneId: 'Vanguard-01',
-    departureHelipad: 'Helipuerto Base Norte',
-    arrivalHelipad: 'Helipuerto Base Sur',
-    frequency: 'Lun → Vie',
-    patrolType: 'Patrullaje vespertino',
-    operatingHeight: 80,
-    date: '2026-11-09',
-    waypoints: [
-      [20.7046, -100.4448],
-      [20.7044, -100.4428],
-      [20.7018, -100.4430],
-      [20.7019, -100.4448],
-      [20.7046, -100.4448],
-    ],
-  },
-]
-
-/**
- * Telemetría de Verificación Prevuelo y Techo Operativo
- */
-export const initialPreflightData = {
-  overallStatus: 'Todo Listo',
-  isReady: true,
+export const PREFLIGHT_BASE = {
+  overallStatus: 'Sin datos',
+  isReady: false,
   operatingCeiling: {
-    height: '80m AGL',
-    regulatoryLimit: '< 200m',
-    complianceText: 'CUMPLE NORMATIVA',
-    isCompliant: true,
+    height: '—',
+    regulatoryLimit: `< ${PREFLIGHT_LIMITS.regulatoryCeilingM}m`,
+    complianceText: 'SIN ZONA ACTIVA',
+    isCompliant: null,
   },
   metrics: {
     wind: {
       label: 'Viento',
-      value: '8 km/h',
-      numeric: 8,
-      statusLabel: 'Óptimo',
-      statusType: 'success',
-      maxLimit: 25, // km/h
+      value: '—',
+      numeric: null,
+      statusLabel: 'Sin estación',
+      statusType: '',
+      maxLimit: PREFLIGHT_LIMITS.windMaxKmh,
     },
     battery: {
       label: 'Batería',
-      value: '100%',
-      numeric: 100,
-      statusLabel: 'Carga Plena',
-      statusType: 'success',
-      minLimit: 35, // %
+      value: '—',
+      numeric: null,
+      statusLabel: 'Sin datos',
+      statusType: '',
+      minLimit: PREFLIGHT_LIMITS.batteryMinPct,
     },
     rfSignal: {
       label: 'Señal RF',
-      value: '-58 dBm',
-      numeric: -58,
-      statusLabel: 'Excelente',
-      statusType: 'success',
-      minAcceptableDbm: -85, // dBm
+      value: '—',
+      numeric: null,
+      statusLabel: 'Sin enlace',
+      statusType: '',
+      minAcceptableDbm: PREFLIGHT_LIMITS.rfMinDbm,
     },
   },
-}
-
-/**
- * Estado general del sistema de comunicación del dron
- */
-export const initialDroneCommState = {
-  droneName: 'AeroLuferan',
-  model: 'Vanguard-01',
-  isConnected: true,
-  signalQuality: 98, // Representa calidad de enlace RF, no batería
-  latencyMs: 42,
-  status: 'online', // 'online' | 'degraded' | 'disconnected'
 }
 
 /**
@@ -256,47 +111,21 @@ export function calculatePathDistance(waypoints) {
 }
 
 /**
- * Capa de persistencia compartida (Misiones)
- */
-export function getStoredMissions() {
-  try {
-    const raw = localStorage.getItem(MISSIONS_STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch {
-    // fallback
-  }
-  return initialScheduledMissions
-}
-
-export function saveMission(newMission) {
-  const current = getStoredMissions()
-  const updated = [newMission, ...current]
-  try {
-    localStorage.setItem(MISSIONS_STORAGE_KEY, JSON.stringify(updated))
-    window.dispatchEvent(new CustomEvent('aeroluferan_missions_updated', { detail: updated }))
-  } catch {
-    // ignore
-  }
-  return updated
-}
-
-/**
- * Capa de persistencia compartida (Geocercas)
+ * Capa de persistencia compartida (Geocercas).
+ * Sin datos semilla: la lista la puebla syncGeofences() desde el backend
+ * y las zonas de exclusión que el operador crea localmente.
  */
 export function getStoredGeofences() {
   try {
     const raw = localStorage.getItem(GEOFENCES_STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      if (Array.isArray(parsed)) return parsed
     }
   } catch {
     // fallback
   }
-  return initialGeofences
+  return []
 }
 
 export function saveGeofences(geofences) {
