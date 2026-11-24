@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import DroneVideoPlayer from '../../../components/DroneVideoPlayer.jsx'
 import EmergencyStopModal from '../../../components/EmergencyStopModal.jsx'
 import GuardiaBottomNav from '../../../components/GuardiaBottomNav.jsx'
+import MissionProgressPanel from '../../../components/MissionProgressPanel.jsx'
 import {
   AltitudeIcon,
   BatteryIcon,
@@ -11,7 +12,6 @@ import {
   HeliportIcon,
   HomeIcon,
   PauseIcon,
-  PlaneIcon,
   PlayIcon,
   SatelliteIcon,
   StopIcon,
@@ -20,11 +20,12 @@ import {
 import useDroneTelemetry from '../../../hooks/useDroneTelemetry.js'
 import useLiveVideoStream from '../../../hooks/useLiveVideoStream.js'
 import { droneControlService } from '../../../services/droneControlService.js'
+import aeroluferanLogo from '../../../assets/aeroluferan-logo.png'
 import {
   confirmMissionLanded,
   startMission,
 } from '../../../services/missionService.js'
-import { refreshTelemetry } from '../../../services/telemetryService.js'
+import { refreshTelemetry, selectChargingBase } from '../../../services/telemetryService.js'
 import './EnVivo.css'
 
 const telemetryIcons = {
@@ -82,6 +83,7 @@ function QuickActions({
   isPaused,
   missionEstado,
   missionBusy,
+  canReturnToBase,
   onStartMission,
   onConfirmLanded,
   onStartPreset,
@@ -169,6 +171,7 @@ function QuickActions({
           className="drone-action"
           type="button"
           onClick={onReturnToBase}
+          disabled={!canReturnToBase}
         >
           <span className="drone-action__icon">
             <HomeIcon />
@@ -199,7 +202,14 @@ function QuickActions({
   )
 }
 
-function HeliportCard({ heliport }) {
+function stationLabel(station) {
+  if (station.station_id === 'helipuerto_norte') return 'Base Norte'
+  if (station.station_id === 'helipuerto_sur') return 'Base Sur'
+  return station.nombre || station.codigo || station.station_id
+}
+
+function HeliportCard({ heliport, onSelectStation, stationBusy }) {
+  const stations = heliport.stations || []
   return (
     <section className="heliport-card" aria-label="Estado del helipuerto asignado">
       <div className="heliport-card__main">
@@ -218,6 +228,34 @@ function HeliportCard({ heliport }) {
           {heliport.protectionDome}
         </span>
         <strong>{heliport.landingStatus}</strong>
+        {stations.length > 0 && (
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {stations.map((station) => {
+              const active = station.station_id === heliport.stationId
+              return (
+                <button
+                  key={station.station_id}
+                  type="button"
+                  disabled={stationBusy || active}
+                  onClick={() => onSelectStation(station.station_id)}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 999,
+                    padding: '5px 10px',
+                    font: 'inherit',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: active ? '#fff' : '#334155',
+                    background: active ? '#0f766e' : '#fff',
+                  }}
+                >
+                  {stationLabel(station)}
+                </button>
+              )
+            })}
+          </span>
+        )}
       </div>
     </section>
   )
@@ -225,14 +263,17 @@ function HeliportCard({ heliport }) {
 
 function GuardiaEnVivo() {
   const navigate = useNavigate()
-  const { drone, flight, preview, cards, quickActions, heliport } = useDroneTelemetry()
+  const { drone, flight, preview, cards, quickActions, heliport, link, raw } = useDroneTelemetry()
   const { streamUrl, isLive, connectionState, info: streamInfo } = useLiveVideoStream()
+  const canReturnToBase = Boolean(link?.droneConnected) && Boolean(flight.armed)
+  const isPaused = Boolean(flight.isPaused)
 
-  const [isPaused, setIsPaused] = useState(Boolean(flight.isPaused))
   const [actionMessage, setActionMessage] = useState('')
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
   const [isEmergencyStopping, setIsEmergencyStopping] = useState(false)
+  const [emergencyError, setEmergencyError] = useState('')
   const [missionBusy, setMissionBusy] = useState(false)
+  const [stationBusy, setStationBusy] = useState(false)
 
   async function handleStartMission() {
     if (!flight.missionId) return
@@ -291,13 +332,11 @@ function GuardiaEnVivo() {
   async function handleTogglePause() {
     try {
       setActionMessage('')
-      if (isPaused) {
-        await droneControlService.resumeFlight()
-        setIsPaused(false)
-      } else {
-        await droneControlService.pauseFlight()
-        setIsPaused(true)
-      }
+      const result = isPaused
+        ? await droneControlService.resumeFlight()
+        : await droneControlService.pauseFlight()
+      setActionMessage(result?.status || (isPaused ? 'Vuelo reanudado.' : 'Vuelo pausado.'))
+      await refreshTelemetry()
     } catch (error) {
       setActionMessage(
         error instanceof Error ? error.message : 'No se pudo pausar o reanudar el vuelo.',
@@ -306,9 +345,15 @@ function GuardiaEnVivo() {
   }
 
   async function handleReturnToBase() {
+    if (!canReturnToBase) {
+      setActionMessage('El dron debe estar conectado y en vuelo para regresar a base.')
+      return
+    }
     try {
       setActionMessage('')
-      await droneControlService.returnToBase(heliport?.stationNumber || '01')
+      const result = await droneControlService.returnToBase(heliport?.stationId)
+      setActionMessage(result?.status || `Regreso ordenado hacia ${heliport?.name || 'la base'}.`)
+      await refreshTelemetry()
     } catch (error) {
       setActionMessage(
         error instanceof Error ? error.message : 'No se pudo ordenar el regreso a base.',
@@ -316,19 +361,42 @@ function GuardiaEnVivo() {
     }
   }
 
+  async function handleSelectStation(stationId) {
+    try {
+      setStationBusy(true)
+      setActionMessage('')
+      const station = await selectChargingBase(stationId)
+      setActionMessage(`Estación activa: ${station?.nombre || stationId}.`)
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo seleccionar la estación.',
+      )
+    } finally {
+      setStationBusy(false)
+    }
+  }
+
+  function closeEmergencyModal() {
+    if (isEmergencyStopping) return
+    setEmergencyError('')
+    setIsEmergencyModalOpen(false)
+  }
+
   async function handleConfirmEmergencyStop() {
     try {
       setIsEmergencyStopping(true)
       setActionMessage('')
-      await droneControlService.emergencyStop()
+      setEmergencyError('')
+      const result = await droneControlService.emergencyStop()
+      setActionMessage(result?.status || 'Parada de emergencia ejecutada.')
+      await refreshTelemetry()
       setIsEmergencyModalOpen(false)
     } catch (error) {
-      setActionMessage(
+      setEmergencyError(
         error instanceof Error ? error.message : 'No se pudo ejecutar la parada inmediata.',
       )
     } finally {
       setIsEmergencyStopping(false)
-      setIsEmergencyModalOpen(false)
     }
   }
 
@@ -337,13 +405,15 @@ function GuardiaEnVivo() {
       {/* 2.1 Encabezado Superior */}
       <header className="live-header">
         <div className="live-header__brand">
-          <span className="live-header__drone-icon">
-            <PlaneIcon />
-          </span>
+          <img
+            className="live-header__logo"
+            src={aeroluferanLogo}
+            alt="Emblema AeroLuferan"
+          />
           <div className="live-header__brand-copy">
             <h1>{drone.name}</h1>
             <span>
-              {drone.model} <i /> <b>{isPaused ? 'Vuelo Pausado' : (drone.patrolStatus || 'En Patrullaje')}</b>
+              {drone.model} <i /> <b>{isPaused ? 'Vuelo Pausado' : (drone.patrolStatus || '—')}</b>
             </span>
           </div>
         </div>
@@ -354,47 +424,62 @@ function GuardiaEnVivo() {
         {/* 2.2 Vuelo Activo */}
         <FlightCard flight={flight} />
 
-        {/* 2.3 Vista Previa del Dron en Vivo - MJPEG del backend */}
-        <DroneVideoPlayer
-          streamUrl={streamUrl}
-          isLive={isLive}
-          connectionState={connectionState}
-          preview={{
-            ...preview,
-            resolution: streamInfo
-              ? `${streamInfo.resolucion} ${streamInfo.fps}fps`
-              : preview.resolution,
-          }}
-        />
+        {/* Columna izquierda: video que crece + progreso de misión */}
+        <div className="live-media-col">
+          {/* 2.3 Vista Previa del Dron en Vivo - MJPEG del backend */}
+          <DroneVideoPlayer
+            streamUrl={streamUrl}
+            isLive={isLive}
+            connectionState={connectionState}
+            vueloId={flight.missionId}
+            preview={{
+              ...preview,
+              resolution: streamInfo
+                ? `${streamInfo.resolucion} ${streamInfo.fps}fps`
+                : preview.resolution,
+            }}
+          />
 
-        {/* 2.4 Datos de Telemetría (4 tarjetas) */}
-        <section
-          className="telemetry-grid"
-          aria-label="Telemetría en tiempo real del dron"
-        >
-          {cards.map((item) => (
-            <TelemetryCard key={item.id} item={item} />
-          ))}
-        </section>
+          {/* 2.3b Progreso de la misión: ocupa la columna bajo el video */}
+          <MissionProgressPanel mission={raw?.mission} />
+        </div>
 
-        {/* 2.5 Acciones Rápidas */}
-        <QuickActions
-          mode={quickActions?.mode || flight.mode}
-          isPaused={isPaused}
-          missionEstado={flight.missionEstado}
-          missionBusy={missionBusy}
-          onStartMission={handleStartMission}
-          onStartPreset={handleStartPreset}
-          onConfirmLanded={handleConfirmLanded}
-          onViewRoutes={handleViewRoutes}
-          onTogglePause={handleTogglePause}
-          onReturnToBase={handleReturnToBase}
-          onRequestEmergencyStop={() => setIsEmergencyModalOpen(true)}
-          actionMessage={actionMessage}
-        />
+        {/* Columna derecha: rail de telemetría y acciones */}
+        <div className="live-rail-col">
+          {/* 2.4 Datos de Telemetría (4 tarjetas) */}
+          <section
+            className="telemetry-grid"
+            aria-label="Telemetría en tiempo real del dron"
+          >
+            {cards.map((item) => (
+              <TelemetryCard key={item.id} item={item} />
+            ))}
+          </section>
 
-        {/* 2.6 Helipuerto */}
-        <HeliportCard heliport={heliport} />
+          {/* 2.5 Acciones Rápidas */}
+          <QuickActions
+            mode={quickActions?.mode || flight.mode}
+            isPaused={isPaused}
+            missionEstado={flight.missionEstado}
+            missionBusy={missionBusy}
+            onStartMission={handleStartMission}
+            onStartPreset={handleStartPreset}
+            onConfirmLanded={handleConfirmLanded}
+            onViewRoutes={handleViewRoutes}
+            onTogglePause={handleTogglePause}
+            canReturnToBase={canReturnToBase}
+            onReturnToBase={handleReturnToBase}
+            onRequestEmergencyStop={() => setIsEmergencyModalOpen(true)}
+            actionMessage={actionMessage}
+          />
+
+          {/* 2.6 Helipuerto */}
+          <HeliportCard
+            heliport={heliport}
+            onSelectStation={handleSelectStation}
+            stationBusy={stationBusy}
+          />
+        </div>
       </main>
 
       {/* 3. Navegación Inferior - Perfil Guardia */}
@@ -404,7 +489,8 @@ function GuardiaEnVivo() {
       <EmergencyStopModal
         isOpen={isEmergencyModalOpen}
         isLoading={isEmergencyStopping}
-        onClose={() => setIsEmergencyModalOpen(false)}
+        error={emergencyError}
+        onClose={closeEmergencyModal}
         onConfirm={handleConfirmEmergencyStop}
       />
     </div>

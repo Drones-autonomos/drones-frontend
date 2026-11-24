@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { CompassTargetIcon } from '../../components/RutasIcons.jsx'
+import { useChargingStations } from '../../hooks/useChargingStations.js'
 import { CAMPUS_CENTER, CAMPUS_DEFAULT_ZOOM } from './rutasData.js'
 import { PATROL_BASES } from './presetRoutes.js'
 
@@ -27,6 +28,10 @@ export default function RutasMap({
   const labelLayerRef = useRef(null)
   const drawingStateRef = useRef({ tempRect: null })
   const [firstCorner, setFirstCorner] = useState(null)
+
+  // Estaciones de carga/helipuertos reales del backend (GET /drone/charging-bases).
+  // Si el backend no responde, el mapa simplemente no dibuja sus marcadores.
+  const { stations: chargingStations } = useChargingStations()
 
   // API imperativa para centrar una zona/misión desde el exterior del mapa.
   useImperativeHandle(ref, () => ({
@@ -148,34 +153,28 @@ export default function RutasMap({
       }
     })
 
-    // 2. Marcadores fijos de Helipuertos
-    const heliNorteIcon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `
-        <div class="map-helipad-badge">
-          <span>H-N</span>
-        </div>
-      `,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13],
-    })
-    L.marker([20.7045, -100.4440], { icon: heliNorteIcon })
-      .bindTooltip('Helipuerto Base Norte', { direction: 'top' })
-      .addTo(group)
+    // 2. Marcadores de helipuertos reales (estaciones reportadas por el backend)
+    chargingStations.forEach((station, index) => {
+      const lat = Number(station.home_lat ?? station.latitud ?? station.lat)
+      const lon = Number(station.home_lon ?? station.longitud ?? station.lon)
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
 
-    const heliSurIcon = L.divIcon({
-      className: 'custom-div-icon',
-      html: `
-        <div class="map-helipad-badge map-helipad-badge--sur">
-          <span>H-S</span>
-        </div>
-      `,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13],
+      const stationIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `
+          <div class="map-helipad-badge${index > 0 ? ' map-helipad-badge--sur' : ''}">
+            <span>H-${index + 1}</span>
+          </div>
+        `,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+      })
+      L.marker([lat, lon], { icon: stationIcon })
+        .bindTooltip(station.nombre || station.codigo || `Estación ${index + 1}`, {
+          direction: index > 0 ? 'bottom' : 'top',
+        })
+        .addTo(group)
     })
-    L.marker([20.7018, -100.4435], { icon: heliSurIcon })
-      .bindTooltip('Helipuerto Base Sur', { direction: 'bottom' })
-      .addTo(group)
 
     // 2b. Bases de patrullaje reales (HOME + Base 1 + Base 2) — estilo propio
     // inline para no depender del CSS de la página contenedora.
@@ -286,7 +285,7 @@ export default function RutasMap({
         }
       })
     }
-  }, [geofences, selectedRoute, missionRoutes, waypoints, allowWaypointEditing, onWaypointsChange])
+  }, [geofences, selectedRoute, missionRoutes, waypoints, allowWaypointEditing, onWaypointsChange, chargingStations])
 
   // Encuadre automático: cubre todas las rutas programadas + bases para que la
   // trayectoria completa (incl. bases fuera del centro del campus) sea visible.

@@ -1,35 +1,31 @@
 /**
  * Servicio Centralizado de Alertas y Notificaciones para AeroLuferan.
- * Sincroniza con el backend institucional:
- *   GET   /alerts/            → historial de alertas
- *   GET   /alerts/{id}        → detalle con evento y detecciones asociadas
- *   PATCH /alerts/{id}/read   → marcar como leída (estado global)
- *   PATCH /events/{id}/status → despachar guardia (EN_REVISION)
- *   WS    /alerts/ws/notifications → nuevas alertas en tiempo real
- *
- * La visualización/descarte por rol (guard|admin) se conserva en un overlay
- * local porque la API no persiste estado por usuario.
+ * Sincroniza con el backend institucional (sin consultas N+1):
+ *   GET   /alerts/              → listado enriquecido con evento, detecciones y estado por usuario
+ *   POST  /alerts/read-all      → marcar todas como leídas para el usuario actual
+ *   PATCH /alerts/{id}/read     → marcar como leída para el usuario actual
+ *   PATCH /alerts/{id}/dismiss  → descartar alerta para el usuario actual (persistido en BD)
+ *   PATCH /events/{id}/status   → despachar guardia (EN_REVISION) o cerrar incidente (RESUELTO)
+ *   GET   /detections/{id}/frame?token=... → evidencia visual autenticada sin 404
+ *   WS    /alerts/ws/notifications → alertas y cambios de estado en tiempo real
  */
 
-import apiClient, { API_URL, buildWsUrl, getAuthToken } from './apiClient.js'
+import apiClient, { API_URL, buildApiUrl, buildWsUrl, getAuthToken, getStoredSession } from './apiClient.js'
 import alertVanguard01 from '../assets/alert-vanguard-01.png'
 import alertVanguard02 from '../assets/alert-vanguard-02.png'
 
 export const ALERTS_STORAGE_KEY = 'aeroluferan_alerts_data'
 export const ALERTS_CHANGED_EVENT = 'aeroluferan_alerts_changed'
+export const CRITICAL_PUSH_EVENT = 'aeroluferan_critical_push'
 const ALERTS_OVERLAY_KEY = 'aeroluferan_alerts_overlay'
+const AJUSTES_CACHE_KEY = 'aeroluferan_settings'
 const SYNC_INTERVAL_MS = 15000
 const WS_RECONNECT_MS = 5000
 const ALERTS_PAGE_SIZE = 100
 const ALERTS_MAX_FETCH = 500
 
-
-/* ==========================================================================
-   Estado del repositorio, overlay local y sincronización con el backend
-   ========================================================================== */
-
 let alertsRepository = loadStoredAlerts()
-let syncState = 'idle' // 'idle' | 'syncing' | 'connected' | 'offline' | 'unauthenticated'
+let syncState = 'idle'
 let syncTimer = null
 let notifySocket = null
 let wsReconnectTimer = null
@@ -53,9 +49,11 @@ function loadStoredAlerts() {
   return []
 }
 
-/** Las rutas de assets empaquetados no sobreviven a localStorage entre builds;
- * restaura la imagen por defecto cuando la alerta guardada usaba un asset local. */
 function resolveStoredImage(alert) {
+  if (alert.deteccionId) {
+    const token = getAuthToken()
+    return buildApiUrl(`/detections/${alert.deteccionId}/frame`, token ? { token } : undefined)
+  }
   if (alert.imageAsset === 'vanguard-01') return alertVanguard01
   if (alert.imageAsset === 'vanguard-02') return alertVanguard02
   if (typeof alert.image === 'string' && alert.image.startsWith('http')) return alert.image
@@ -104,10 +102,18 @@ function updateAlertOverlay(alertId, updater) {
 
 function applyOverlay(alert) {
   const o = getAlertOverlay(alert.id)
+  const backendRead = Boolean(alert.leidaPorUsuario)
+  const backendDismissed = Boolean(alert.descartadaPorUsuario)
   return {
     ...alert,
-    viewedBy: { guard: false, admin: false, ...o.viewedBy },
-    dismissedBy: { guard: false, admin: false, ...o.dismissedBy },
+    viewedBy: {
+      guard: backendRead || Boolean(o.viewedBy?.guard),
+      admin: backendRead || Boolean(o.viewedBy?.admin),
+    },
+    dismissedBy: {
+      guard: backendDismissed || Boolean(o.dismissedBy?.guard),
+      admin: backendDismissed || Boolean(o.dismissedBy?.admin),
+    },
     auditTrail: o.auditTrail || [],
   }
 }
@@ -118,14 +124,23 @@ function applyOverlay(alert) {
 
 const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, '')
 
-function resolveFrameUrl(frameUrl) {
-  if (!frameUrl) return alertVanguard02
-  if (/^https?:\/\//.test(frameUrl)) return frameUrl
-  return `${API_ORIGIN}/${String(frameUrl).replace(/^\/+/, '')}`
+function resolveDetectionImage(deteccion) {
+  if (!deteccion) return alertVanguard02
+  if (deteccion.id && deteccion.frame_url) {
+    const token = getAuthToken()
+    return buildApiUrl(`/detections/${deteccion.id}/frame`, token ? { token } : undefined)
+  }
+  if (deteccion.frame_url && /^https?:\/\//.test(deteccion.frame_url)) {
+    return deteccion.frame_url
+  }
+  if (deteccion.frame_url) {
+    return `${API_ORIGIN}/${String(deteccion.frame_url).replace(/^\/+/, '')}`
+  }
+  return alertVanguard02
 }
 
 function formatCoords(lat, lon) {
-  if (typeof lat !== 'number' || typeof lon !== 'number') return 'Zona de patrullaje'
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return '—'
   const ns = lat >= 0 ? 'N' : 'S'
   const ew = lon >= 0 ? 'E' : 'W'
   return `${Math.abs(lat).toFixed(4)}° ${ns}, ${Math.abs(lon).toFixed(4)}° ${ew}`
@@ -161,24 +176,38 @@ const EVENT_STATUS_LABELS = {
   RESUELTO: 'Resuelto',
 }
 
-/**
- * Convierte una alerta del backend (AlertaDetailResponse) al shape
- * que consumen las tarjetas de alertas.
- */
 export function mapBackendAlert(detail) {
   const evento = detail.evento || {}
   const deteccion = evento.detecciones?.[0] || null
   const tipo = evento.tipo === 'HUMO_DETECTADO' ? 'humo' : 'intruso'
   const nivel = String(detail.nivel_criticidad || evento.nivel_criticidad || 'MEDIA').toUpperCase()
-  const coords = deteccion ? formatCoords(deteccion.latitud, deteccion.longitud) : 'Zona de patrullaje'
+  const coords =
+    deteccion?.latitud != null && deteccion?.longitud != null
+      ? formatCoords(Number(deteccion.latitud), Number(deteccion.longitud))
+      : '—'
   const estadoEvento = String(evento.estado || 'PENDIENTE').toUpperCase()
   const timestampIso = detail.timestamp_envio || evento.created_at
   const droneName = 'AeroLuferan'
+  const altMeters = deteccion?.altitud_metros
+  const altitudeLabel =
+    typeof altMeters === 'number' && Number.isFinite(altMeters)
+      ? `${Math.round(altMeters)}m AGL`
+      : 'N/A'
+
+  const checksum = deteccion?.checksum_sha256 || null
+  const auditSeal = checksum
+    ? {
+        text: 'Evidencia sellada SHA-256',
+        code: `#${checksum.slice(0, 8).toUpperCase()}`,
+        fullHash: checksum,
+      }
+    : null
 
   return {
     id: detail.id,
     backendId: detail.id,
     eventoId: detail.evento_id ?? evento.id ?? null,
+    deteccionId: deteccion?.id ?? null,
     droneId: droneName,
     droneName,
     badgeNumber: String(detail.id),
@@ -191,32 +220,40 @@ export function mapBackendAlert(detail) {
     detection:
       deteccion?.tipo === 'HUMO'
         ? 'Humo detectado'
-        : deteccion?.tipo === 'PERSONA'
-          ? 'Persona detectada'
-          : `Evento ${evento.tipo || 'de seguridad'}`,
+        : evento.tipo === 'PERSONA_ZONA_RESTRINGIDA'
+          ? 'Intruso en zona restringida'
+          : deteccion?.tipo === 'PERSONA'
+            ? 'Persona detectada'
+            : `Evento ${evento.tipo || 'de seguridad'}`,
     detectionType: tipo === 'humo' ? 'thermal' : 'motion',
     confidence:
       typeof deteccion?.nivel_confianza === 'number'
         ? `IA ${(deteccion.nivel_confianza * 100).toFixed(1)}%`
         : 'IA —',
     coordinates: coords,
-    altitude: 'N/A',
+    altitude: altitudeLabel,
     timestamp: formatTime(timestampIso),
-    image: deteccion ? resolveFrameUrl(deteccion.frame_url) : alertVanguard02,
+    image: resolveDetectionImage(deteccion),
     incidentTitle: detail.titulo || 'Incidente de seguridad',
     description: evento.descripcion || detail.mensaje || 'Sin descripción disponible.',
-    audit: null,
+    audit: auditSeal,
     dispatchButtonTheme: nivel === 'CRITICA' ? 'critical' : 'dark',
+    estadoEvento,
     status: EVENT_STATUS_LABELS[estadoEvento] || 'Pendiente',
     attentionStatus: EVENT_STATUS_LABELS[estadoEvento] || 'Pendiente',
+    notasResolucion: evento.notas_resolucion || null,
+    dispatched: estadoEvento === 'EN_REVISION' || estadoEvento === 'RESUELTO',
+    resolved: estadoEvento === 'RESUELTO',
     leida: Boolean(detail.leida),
+    leidaPorUsuario: Boolean(detail.leida_por_usuario ?? detail.leida),
+    descartadaPorUsuario: Boolean(detail.descartada),
     destinatarioRol: detail.destinatario_rol,
     viewedBy: { guard: false, admin: false },
     dismissedBy: { guard: false, admin: false },
     telemetry: {
       droneId: droneName,
       battery: '—',
-      altitude: '—',
+      altitude: altitudeLabel,
       windSpeed: '—',
       gps: coords,
       heading: '—',
@@ -229,15 +266,13 @@ export function mapBackendAlert(detail) {
 }
 
 /* ==========================================================================
-   Sincronización con el backend (REST + WebSocket de notificaciones)
+   Sincronización con el backend (REST enriquecido + WebSocket)
    ========================================================================== */
 
 export function getAlertsSyncState() {
   return syncState
 }
 
-/* El backend limita cada página a ALERTS_PAGE_SIZE; se recorren páginas
-   hasta agotar el historial o alcanzar ALERTS_MAX_FETCH. */
 async function fetchAllAlerts() {
   const collected = []
   let skip = 0
@@ -262,14 +297,15 @@ export async function syncAlertsFromBackend() {
   syncState = 'syncing'
   try {
     const list = await fetchAllAlerts()
-    const details = await Promise.all(
+    // GET /alerts/ ya incluye evento + detecciones; solo consulta /{id} si algún registro antiguo no lo trajera.
+    const enriched = await Promise.all(
       (list || []).map((a) =>
-        apiClient
-          .get(`/alerts/${a.id}`, { skipAuthRedirect: true })
-          .catch(() => a),
+        a.evento
+          ? Promise.resolve(a)
+          : apiClient.get(`/alerts/${a.id}`, { skipAuthRedirect: true }).catch(() => a),
       ),
     )
-    alertsRepository = (details || []).map((d) => applyOverlay(mapBackendAlert(d)))
+    alertsRepository = (enriched || []).map((d) => applyOverlay(mapBackendAlert(d)))
     persistAlerts()
     syncState = 'connected'
     notifyListeners()
@@ -279,6 +315,66 @@ export async function syncAlertsFromBackend() {
     syncState = 'offline'
     notifyListeners()
     return alertsRepository
+  }
+}
+
+export function isCriticalPushEnabledForCurrentUser() {
+  if (typeof window === 'undefined') return true
+  const prefs = getStoredSession()?.preferencias
+  if (prefs && typeof prefs === 'object') {
+    if (typeof prefs.critical_push_enabled === 'boolean') return prefs.critical_push_enabled
+    if (typeof prefs.criticalPushEnabled === 'boolean') return prefs.criticalPushEnabled
+  }
+  try {
+    const rawSettings = localStorage.getItem(AJUSTES_CACHE_KEY)
+    if (rawSettings) {
+      const parsed = JSON.parse(rawSettings)
+      if (typeof parsed?.criticalPushEnabled === 'boolean') return parsed.criticalPushEnabled
+    }
+  } catch {
+    // ignore malformed local cache
+  }
+  return true
+}
+
+export function getBrowserNotificationPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported'
+  return window.Notification.permission
+}
+
+export async function requestBrowserNotificationPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported'
+  if (window.Notification.permission !== 'default') return window.Notification.permission
+  try {
+    return await window.Notification.requestPermission()
+  } catch {
+    return window.Notification.permission
+  }
+}
+
+function handleIncomingRealtimeMessage(rawData) {
+  syncAlertsFromBackend()
+  if (!rawData || typeof window === 'undefined') return
+  let payload
+  try {
+    payload = typeof rawData === 'string' ? JSON.parse(rawData) : rawData
+  } catch {
+    return
+  }
+  if (!payload || payload.type !== 'NEW_ALERT') return
+  if (payload.push_enabled === false || !isCriticalPushEnabledForCurrentUser()) return
+
+  window.dispatchEvent(new CustomEvent(CRITICAL_PUSH_EVENT, { detail: payload }))
+
+  if ('Notification' in window && window.Notification.permission === 'granted') {
+    try {
+      new window.Notification(payload.titulo || 'Alerta de Seguridad AeroLuferan', {
+        body: payload.mensaje || 'Se registró un nuevo incidente en patrullaje aéreo.',
+        tag: `aeroluferan-alert-${payload.alerta_id || Date.now()}`,
+      })
+    } catch {
+      // ignore desktop notification restrictions
+    }
   }
 }
 
@@ -294,8 +390,8 @@ function connectNotificationsSocket() {
     return
   }
 
-  notifySocket.onmessage = () => {
-    syncAlertsFromBackend()
+  notifySocket.onmessage = (event) => {
+    handleIncomingRealtimeMessage(event?.data)
   }
   notifySocket.onclose = () => {
     notifySocket = null
@@ -335,7 +431,6 @@ export function stopAlertsSync() {
   }
 }
 
-// Suscriptores en memoria
 const listeners = new Set()
 
 function notifyListeners() {
@@ -358,12 +453,9 @@ function notifyListeners() {
 }
 
 /* ==========================================================================
-   API pública (misma interfaz que la versión demo)
+   API pública
    ========================================================================== */
 
-/**
- * Normaliza el rol ('guard' o 'admin')
- */
 export function normalizeRole(role) {
   if (!role) return 'guard'
   const lower = String(role).toLowerCase()
@@ -371,18 +463,11 @@ export function normalizeRole(role) {
   return 'guard'
 }
 
-/**
- * Obtiene todas las alertas no descartadas para el rol especificado.
- */
 export function getVisibleAlerts(role = 'guard') {
   const normRole = normalizeRole(role)
   return alertsRepository.filter((alert) => !alert.dismissedBy?.[normRole])
 }
 
-/**
- * Obtiene la cantidad de alertas nuevas / no visualizadas por el usuario del rol especificado.
- * Si no hay alertas no visualizadas, retorna 0 (no mostrar contador ni círculo).
- */
 export function getPendingAlertsCount(role = 'guard') {
   const normRole = normalizeRole(role)
   return alertsRepository.filter(
@@ -390,17 +475,10 @@ export function getPendingAlertsCount(role = 'guard') {
   ).length
 }
 
-/**
- * Retorna todas las alertas en memoria (incluidas descartadas para auditoría).
- */
 export function getAllAlerts() {
   return [...alertsRepository]
 }
 
-/**
- * Suscribe una función para recibir actualizaciones cuando cambie el repositorio.
- * Retorna una función para cancelar la suscripción.
- */
 export function subscribeAlerts(listener, role = 'guard') {
   const normRole = normalizeRole(role)
   const wrappedListener = (allAlerts) => {
@@ -413,7 +491,6 @@ export function subscribeAlerts(listener, role = 'guard') {
   listeners.add(wrappedListener)
   ensureSyncLoop()
 
-  // Disparar inmediatamente el estado actual
   try {
     const currentUnread = getPendingAlertsCount(normRole)
     listener(currentUnread, alertsRepository)
@@ -433,10 +510,6 @@ function patchAlertInRepository(alertId, updater) {
   notifyListeners()
 }
 
-/**
- * Marca una alerta como vista por un rol específico (e.g., 'guard' o 'admin').
- * Además notifica al backend (PATCH /alerts/{id}/read) de forma best-effort.
- */
 export function markAlertAsViewed(alertId, role = 'guard') {
   const normRole = normalizeRole(role)
   updateAlertOverlay(alertId, (o) => ({
@@ -445,6 +518,7 @@ export function markAlertAsViewed(alertId, role = 'guard') {
   }))
   patchAlertInRepository(alertId, (alert) => ({
     ...alert,
+    leidaPorUsuario: true,
     viewedBy: { ...alert.viewedBy, [normRole]: true },
   }))
 
@@ -456,9 +530,6 @@ export function markAlertAsViewed(alertId, role = 'guard') {
   }
 }
 
-/**
- * Marca todas las alertas visibles como vistas por el rol especificado.
- */
 export function markAllAlertsAsViewed(role = 'guard') {
   const normRole = normalizeRole(role)
   alertsRepository.forEach((alert) => {
@@ -471,6 +542,7 @@ export function markAllAlertsAsViewed(role = 'guard') {
   })
   alertsRepository = alertsRepository.map((alert) => ({
     ...alert,
+    leidaPorUsuario: true,
     viewedBy: {
       ...alert.viewedBy,
       [normRole]: alert.dismissedBy?.[normRole] ? alert.viewedBy?.[normRole] : true,
@@ -478,21 +550,14 @@ export function markAllAlertsAsViewed(role = 'guard') {
   }))
   notifyListeners()
 
-  alertsRepository
-    .filter((alert) => typeof alert?.backendId === 'number')
-    .forEach((alert) => {
-      apiClient
-        .patch(`/alerts/${alert.backendId}/read`, null, { skipAuthRedirect: true })
-        .catch(() => {})
-    })
+  if (getAuthToken()) {
+    apiClient.post('/alerts/read-all', null, { skipAuthRedirect: true }).catch(() => {})
+  }
 }
 
-/**
- * Descarta una alerta para el rol especificado (retirándola de su vista visible).
- * Conserva trazabilidad de auditoría local; la API no expone descarte por usuario.
- */
 export function dismissAlert(alertId, role = 'guard') {
   const normRole = normalizeRole(role)
+  const target = alertsRepository.find((a) => a.id === alertId)
   const entry = {
     action: 'DISMISS_ALERT',
     role: normRole,
@@ -506,23 +571,26 @@ export function dismissAlert(alertId, role = 'guard') {
   }))
   patchAlertInRepository(alertId, (alert) => ({
     ...alert,
+    descartadaPorUsuario: true,
     dismissedBy: { ...alert.dismissedBy, [normRole]: true },
     auditTrail: [...(alert.auditTrail || []), entry],
   }))
+
+  if (typeof target?.backendId === 'number' && getAuthToken()) {
+    apiClient
+      .patch(`/alerts/${target.backendId}/dismiss`, null, { skipAuthRedirect: true })
+      .catch(() => {})
+  }
 }
 
-/**
- * Registra la solicitud de despacho de guardia.
- * Persiste el estado EN_REVISION del evento en el backend (best-effort)
- * y actualiza el estado de atención local con trazabilidad.
- */
-export function dispatchGuard(alertId, role = 'guard') {
+export function dispatchGuard(alertId, role = 'guard', note = '') {
   const normRole = normalizeRole(role)
+  const target = alertsRepository.find((a) => a.id === alertId)
   const entry = {
     action: 'DISPATCH_GUARD',
     role: normRole,
     timestamp: new Date().toISOString(),
-    note: `Despacho de guardia solicitado desde perfil ${normRole}.`,
+    note: note || `Despacho de guardia registrado desde perfil ${normRole}.`,
   }
   updateAlertOverlay(alertId, (o) => ({
     ...o,
@@ -531,6 +599,7 @@ export function dispatchGuard(alertId, role = 'guard') {
   }))
   patchAlertInRepository(alertId, (alert) => ({
     ...alert,
+    estadoEvento: 'EN_REVISION',
     attentionStatus: 'En atención (Guardia despachado)',
     status: 'En atención',
     dispatched: true,
@@ -540,29 +609,64 @@ export function dispatchGuard(alertId, role = 'guard') {
     auditTrail: [...(alert.auditTrail || []), entry],
   }))
 
-  const alert = alertsRepository.find((a) => a.id === alertId)
-  if (typeof alert?.eventoId === 'number') {
+  if (typeof target?.eventoId === 'number') {
     apiClient
       .patch(
-        `/events/${alert.eventoId}/status`,
-        { estado: 'EN_REVISION' },
+        `/events/${target.eventoId}/status`,
+        {
+          estado: 'EN_REVISION',
+          ...(note ? { notas_resolucion: note } : {}),
+        },
         { skipAuthRedirect: true },
       )
       .catch(() => {})
   }
 }
 
-/**
- * Vuelve a sincronizar las alertas desde el backend
- * (conserva el nombre histórico usado por las pantallas).
- */
+export async function resolveAlertIncident(alertId, role = 'guard', notasResolucion = '') {
+  const normRole = normalizeRole(role)
+  const target = alertsRepository.find((a) => a.id === alertId)
+  const cleanNote = (notasResolucion || '').trim() || 'Incidente atendido y verificado en sitio.'
+  const entry = {
+    action: 'RESOLVE_INCIDENT',
+    role: normRole,
+    timestamp: new Date().toISOString(),
+    note: cleanNote,
+  }
+
+  updateAlertOverlay(alertId, (o) => ({
+    ...o,
+    viewedBy: { ...o.viewedBy, [normRole]: true },
+    auditTrail: [...(o.auditTrail || []), entry],
+  }))
+  patchAlertInRepository(alertId, (alert) => ({
+    ...alert,
+    estadoEvento: 'RESUELTO',
+    attentionStatus: 'Resuelto',
+    status: 'Resuelto',
+    dispatched: true,
+    resolved: true,
+    notasResolucion: cleanNote,
+    viewedBy: { ...alert.viewedBy, [normRole]: true },
+    auditTrail: [...(alert.auditTrail || []), entry],
+  }))
+
+  if (typeof target?.eventoId === 'number' && getAuthToken()) {
+    await apiClient.patch(
+      `/events/${target.eventoId}/status`,
+      { estado: 'RESUELTO', notas_resolucion: cleanNote },
+      { skipAuthRedirect: true },
+    )
+  }
+}
+
 export function resetAlertsDemo() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(ALERTS_OVERLAY_KEY)
+  }
   return syncAlertsFromBackend()
 }
 
-/**
- * Permite al backend inicializar o sustituir el conjunto de alertas.
- */
 export function setAlertsFromBackend(alertsList) {
   if (Array.isArray(alertsList)) {
     alertsRepository = alertsList.map((a) => applyOverlay(a))

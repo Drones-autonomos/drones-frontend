@@ -7,7 +7,6 @@ import {
   ClockPlanIcon,
   EditIcon,
   ForkRouteIcon,
-  HelmetBrandLogo,
   LightningBoltIcon,
   ShieldCheckIcon,
   ShieldOutlineIcon,
@@ -16,16 +15,17 @@ import {
 } from '../../components/RutasIcons.jsx'
 import RutasMap from './RutasMap.jsx'
 import {
-  HELIPUERTOS,
   calculatePathDistance,
   getStoredGeofences,
   validateRouteAgainstGeofences,
 } from './rutasData.js'
 import { createMission, updateMission } from '../../services/missionService.js'
 import { validateRouteOnBackend } from '../../services/geofenceService.js'
-import apiClient from '../../services/apiClient.js'
+import apiClient, { describeApiError } from '../../services/apiClient.js'
 import { fetchPresetRoutes, getPresetRoutes } from './presetRoutes.js'
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
+import aeroluferanLogo from '../../assets/aeroluferan-logo.png'
+import useChargingStations from '../../hooks/useChargingStations.js'
 import './ProgramarRuta.css'
 
 const DAYS_OF_WEEK = [
@@ -148,18 +148,46 @@ export default function ProgramarRuta() {
   )
 
   // 6. Planificación de vuelo (Fechas, horarios y helipuertos)
+  // Los helipuertos disponibles son las estaciones reales del backend
+  // (GET /drone/charging-bases); sin conexión el selector queda vacío.
+  const {
+    stations: heliportStations,
+    isLoading: heliportsLoading,
+    error: heliportsError,
+  } = useChargingStations()
+
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
   const [departureDate, setDepartureDate] = useState(editSchedule?.start?.date || todayStr)
   const [departureTime, setDepartureTime] = useState(editSchedule?.start?.time || '18:30')
   const [departureHelipad, setDepartureHelipad] = useState(
-    editMission?.helipuerto_salida || HELIPUERTOS[0],
+    editMission?.helipuerto_salida || '',
   )
 
   const [arrivalDate, setArrivalDate] = useState(editSchedule?.end?.date || todayStr)
   const [arrivalTime, setArrivalTime] = useState(editSchedule?.end?.time || '19:02')
   const [arrivalHelipad, setArrivalHelipad] = useState(
-    editMission?.helipuerto_llegada || HELIPUERTOS[0],
+    editMission?.helipuerto_llegada || '',
   )
+
+  // Estación por defecto cuando el backend responde (patrón "ajustar estado
+  // durante el render" al llegar la lista, igual que `prevView` en Ajustes).
+  const [helipadsInitialized, setHelipadsInitialized] = useState(false)
+  if (!helipadsInitialized && heliportStations.length > 0) {
+    setHelipadsInitialized(true)
+    const firstName = heliportStations[0].nombre || heliportStations[0].station_id || ''
+    setDepartureHelipad((current) => current || firstName)
+    setArrivalHelipad((current) => current || firstName)
+  }
+
+  // Opciones del selector: estaciones del backend; preserva el valor actual
+  // cuando proviene de una misión guardada con un nombre ya no listado.
+  function heliportOptions(current) {
+    const names = heliportStations
+      .map((station) => station.nombre || station.station_id)
+      .filter(Boolean)
+    if (current && !names.includes(current)) return [current, ...names]
+    return names
+  }
 
   // Frecuencia y días seleccionados
   const [isRecurring, setIsRecurring] = useState(
@@ -414,9 +442,7 @@ export default function ProgramarRuta() {
         navigate('/admin/rutas')
       }, 900)
     } catch (error) {
-      setFormError(
-        error instanceof Error ? error.message : 'No se pudo registrar la misión en el backend.',
-      )
+      setFormError(describeApiError(error, 'No se pudo registrar la misión en el backend.'))
     } finally {
       setIsSaving(false)
     }
@@ -430,7 +456,11 @@ export default function ProgramarRuta() {
         {/* ============================================================== */}
         <header className="programar-header-bar">
           <div className="programar-brand">
-            <HelmetBrandLogo size={36} />
+            <img
+              src={aeroluferanLogo}
+              alt="Emblema AeroLuferan"
+              style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0 }}
+            />
             <h1 className="programar-brand-name">AeroLuferan</h1>
           </div>
         </header>
@@ -673,7 +703,7 @@ export default function ProgramarRuta() {
                 <strong className="plan-card-val">
                   {departureDate === todayStr ? 'Hoy' : departureDate}, {departureTime}
                 </strong>
-                <span className="plan-card-sub">{departureHelipad}</span>
+                <span className="plan-card-sub">{departureHelipad || '—'}</span>
               </div>
 
               {/* Tarjeta 2: ATERRIZAJE */}
@@ -689,7 +719,7 @@ export default function ProgramarRuta() {
                 <strong className="plan-card-val">
                   {arrivalDate === todayStr ? 'Hoy' : arrivalDate}, {arrivalTime}
                 </strong>
-                <span className="plan-card-sub">{arrivalHelipad}</span>
+                <span className="plan-card-sub">{arrivalHelipad || '—'}</span>
               </div>
 
               {/* Tarjeta 3: DURACIÓN (Calculada automáticamente) */}
@@ -782,8 +812,18 @@ export default function ProgramarRuta() {
                 <select
                   value={departureHelipad}
                   onChange={(e) => setDepartureHelipad(e.target.value)}
+                  disabled={heliportStations.length === 0}
                 >
-                  {HELIPUERTOS.map((h) => (
+                  {heliportStations.length === 0 && (
+                    <option value="">
+                      {heliportsLoading
+                        ? 'Cargando estaciones…'
+                        : heliportsError
+                          ? 'Sin estaciones: no se pudo conectar al servidor'
+                          : 'Sin estaciones registradas'}
+                    </option>
+                  )}
+                  {heliportOptions(departureHelipad).map((h) => (
                     <option key={h} value={h}>
                       {h}
                     </option>
@@ -832,8 +872,18 @@ export default function ProgramarRuta() {
                 <select
                   value={arrivalHelipad}
                   onChange={(e) => setArrivalHelipad(e.target.value)}
+                  disabled={heliportStations.length === 0}
                 >
-                  {HELIPUERTOS.map((h) => (
+                  {heliportStations.length === 0 && (
+                    <option value="">
+                      {heliportsLoading
+                        ? 'Cargando estaciones…'
+                        : heliportsError
+                          ? 'Sin estaciones: no se pudo conectar al servidor'
+                          : 'Sin estaciones registradas'}
+                    </option>
+                  )}
+                  {heliportOptions(arrivalHelipad).map((h) => (
                     <option key={h} value={h}>
                       {h}
                     </option>

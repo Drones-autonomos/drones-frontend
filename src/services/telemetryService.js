@@ -38,7 +38,7 @@ const SIMULATE_DRONE_CONNECTED = true
 let currentTelemetry = {
   drone: {
     name: 'AeroLuferan',
-    model: 'Vanguard-01',
+    model: '—',
     patrolStatus: 'Sin conexión',
     signalPercentage: 0,
     signalLabel: 'Señal',
@@ -57,7 +57,7 @@ let currentTelemetry = {
     status: 'SIN SEÑAL',
     resolution: '—',
     encryption: 'AES-256',
-    observedArea: 'Campus FIF',
+    observedArea: '—',
     areaStatus: '—',
     heading: 'HDG —',
     tilt: '—',
@@ -69,12 +69,12 @@ let currentTelemetry = {
     { id: 'gps', value: 'Sin fix', satellites: null, detail: 'Sin datos', status: '', label: 'GPS', unit: 'Sat' },
   ],
   heliport: {
-    name: 'Helipuerto Norte #01',
+    name: '—',
     stationId: null,
     stationNumber: '—',
-    landingSystem: 'Pad de inducción magnética',
+    landingSystem: '—',
     availability: '—',
-    protectionDome: 'Domo protector abierto',
+    protectionDome: '—',
     landingStatus: 'Sin datos',
   },
   link: {
@@ -370,7 +370,7 @@ function rebuildTelemetry() {
           ? `${stream.resolucion}${stream.fps ? ` ${stream.fps}fps` : ''}`
           : '—',
       encryption: 'AES-256',
-      observedArea: vehicle.zonaActual || 'Campus FIF',
+      observedArea: vehicle.zonaActual || '—',
       areaStatus: vehicle.estadoZona || (vehicle.connected ? 'Monitoreo' : '—'),
       heading: rumbo != null ? `HDG ${Math.round(rumbo)}° ${compassDirection(rumbo)}` : 'HDG —',
       tilt: vehicle.tiltDeg != null ? `${Number(vehicle.tiltDeg).toFixed(1)}°` : '—',

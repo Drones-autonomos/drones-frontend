@@ -25,20 +25,23 @@
    ENCABEZADO SUPERIOR
    ========================================================================== */
 .programar-header-bar {
-  padding: 16px 20px 12px;
+  padding: 16px 20px 14px;
   background: #ffffff;
   border-bottom: 1px solid #edf2f7;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 .programar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .programar-brand-name {
   margin: 0;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
   color: #172f52;
   line-height: 1.15;

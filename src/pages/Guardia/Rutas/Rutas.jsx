@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import GuardiaBottomNav from '../../../components/GuardiaBottomNav.jsx'
-import helmetLogo from '../../../assets/helmet-logo.png'
+import helmetLogo from '../../../assets/aeroluferan-logo.png'
 import {
   AdjustSliderIcon,
   AutonomousFlightIcon,
@@ -32,10 +32,12 @@ import useDroneTelemetry from '../../../hooks/useDroneTelemetry.js'
 import {
   listMissions,
   startMission,
+  retryMission,
   cancelMission,
   confirmMissionLanded,
   getSchedulerStatus,
   MISSIONS_UPDATED_EVENT,
+  RETRYABLE_ESTADOS,
 } from '../../../services/missionService.js'
 import {
   syncGeofences,
@@ -208,7 +210,8 @@ export default function GuardiaRutas() {
       return
     }
 
-    if (selectedMission.estado !== 'PROGRAMADA') {
+    const isRetryable = RETRYABLE_ESTADOS.has(selectedMission.estado)
+    if (selectedMission.estado !== 'PROGRAMADA' && !isRetryable) {
       setFlightStatusMessage({
         type: 'error',
         text: `La misión "${selectedMission.name}" está en estado ${selectedMission.estado} y no puede iniciarse.`,
@@ -237,7 +240,9 @@ export default function GuardiaRutas() {
 
     try {
       setPendingActionId(selectedMission.id)
-      const started = await startMission(selectedMission.id)
+      const started = isRetryable
+        ? await retryMission(selectedMission.id)
+        : await startMission(selectedMission.id)
       setFlightStatusMessage({
         type: 'success',
         text: `Misión "${started.name}" en ejecución. Redirigiendo a monitoreo En Vivo...`,
@@ -496,7 +501,8 @@ export default function GuardiaRutas() {
             disabled={
               !selectedMission ||
               pendingActionId !== null ||
-              !['PROGRAMADA', 'EN_CURSO'].includes(selectedMission.estado)
+              (!['PROGRAMADA', 'EN_CURSO'].includes(selectedMission.estado) &&
+                !RETRYABLE_ESTADOS.has(selectedMission.estado))
             }
           >
             {!selectedMission
@@ -505,7 +511,9 @@ export default function GuardiaRutas() {
                 ? 'Monitorear En Vivo'
                 : selectedMission.estado === 'PROGRAMADA'
                   ? pendingActionId === selectedMission.id ? 'Iniciando…' : 'Iniciar Vuelo'
-                  : `Misión ${selectedMission.statusBadge || selectedMission.estado}`}
+                  : RETRYABLE_ESTADOS.has(selectedMission.estado)
+                    ? pendingActionId === selectedMission.id ? 'Reiniciando…' : `Reintentar Misión (${selectedMission.statusBadge || selectedMission.estado})`
+                    : `Misión ${selectedMission.statusBadge || selectedMission.estado}`}
           </button>
 
           {/* ============================================================== */}

@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import GuardiaBottomNav from '../../components/GuardiaBottomNav.jsx'
-import helmetLogo from '../../assets/helmet-logo.png'
+import helmetLogo from '../../assets/aeroluferan-logo.png'
 import useAlerts from '../../hooks/useAlerts.js'
+import {
+  CRITICAL_PUSH_EVENT,
+  getBrowserNotificationPermission,
+  isCriticalPushEnabledForCurrentUser,
+  requestBrowserNotificationPermission,
+  resolveAlertIncident,
+} from '../../services/alertService.js'
 import './Alertas.css'
-
-/* ==========================================================================
-   COMPONENTES SVG INDEPENDIENTES Y EDITABLES
-   Cumple la regla de componentes vectoriales sin emojis ni imágenes aplanadas
-   ========================================================================== */
 
 function HeaderBellIcon() {
   return (
@@ -103,10 +105,6 @@ function DispatchNavIcon() {
   )
 }
 
-/* ==========================================================================
-   CONFIGURACIÓN DE FILTROS
-   ========================================================================== */
-
 const filterDefinitions = [
   { id: 'all', label: 'Todas', hasDot: false },
   { id: 'humo', label: 'Humo / Fuego', hasDot: true, dotClass: 'alertas-guardia-filter-dot--humo', countClass: 'alertas-guardia-filter-count--humo' },
@@ -115,12 +113,49 @@ const filterDefinitions = [
 
 export default function GuardiaAlertas() {
   const navigate = useNavigate()
-  const { alerts, pendingAlertsCount, markAsViewed, markAllAsViewed, dismissAlert, dispatchGuard, resetDemo } = useAlerts('guard')
+  const {
+    alerts,
+    pendingAlertsCount,
+    markAsViewed,
+    markAllAsViewed,
+    dismissAlert,
+    dispatchGuard,
+    resetDemo,
+  } = useAlerts('guard')
 
   const [activeFilter, setActiveFilter] = useState('all')
   const [statusMessage, setStatusMessage] = useState('')
+  const [resolvingAlert, setResolvingAlert] = useState(null)
+  const [resolutionNote, setResolutionNote] = useState('')
+  const [isSavingResolution, setIsSavingResolution] = useState(false)
 
-  // Cálculo dinámico de contadores por filtro
+  useEffect(() => {
+    const onCriticalPush = (event) => {
+      const detail = event?.detail
+      if (!detail) return
+      setStatusMessage(`ALERTA EN TIEMPO REAL: ${detail.titulo || 'Nuevo incidente crítico detectado'}`)
+    }
+    window.addEventListener(CRITICAL_PUSH_EVENT, onCriticalPush)
+    return () => window.removeEventListener(CRITICAL_PUSH_EVENT, onCriticalPush)
+  }, [])
+
+  const handleBellClick = async () => {
+    const pushActive = isCriticalPushEnabledForCurrentUser()
+    if (!pushActive) {
+      setStatusMessage('Las Alertas Push Críticas están silenciadas en Ajustes.')
+      return
+    }
+    const perm = getBrowserNotificationPermission()
+    if (perm === 'default') {
+      const granted = await requestBrowserNotificationPermission()
+      if (granted === 'granted') {
+        setStatusMessage('Notificaciones push del navegador activadas para alertas críticas.')
+        return
+      }
+    }
+    setStatusMessage(`Notificaciones Push activas. ${pendingAlertsCount} nuevas sin visualizar.`)
+  }
+
   const filterCounts = useMemo(() => {
     return {
       all: alerts.length,
@@ -129,13 +164,11 @@ export default function GuardiaAlertas() {
     }
   }, [alerts])
 
-  // Lista filtrada visible
   const visibleAlerts = useMemo(() => {
     if (activeFilter === 'all') return alerts
     return alerts.filter((alert) => alert.type === activeFilter)
   }, [activeFilter, alerts])
 
-  // Acción 1: Ver en Vivo (navega a /guardia/live con telemetría del dron y marca alerta como vista)
   const handleViewLive = (alert) => {
     markAsViewed(alert.id)
     navigate('/guardia/en-vivo', {
@@ -147,34 +180,51 @@ export default function GuardiaAlertas() {
     })
   }
 
-  // Acción 2: Despachar Guardia (función local independiente con simulación y trazabilidad)
   const handleDispatch = (alert) => {
     dispatchGuard(alert.id)
     setStatusMessage(
-      `Solicitud de despacho registrada para ${alert.droneName}. Estado actualizado a "En atención".`,
+      `Despacho registrado en el servidor para Incidente #${alert.eventoId || alert.id}. Estado actualizado a "En atención".`,
     )
   }
 
-  // Acción 3: Descartar notificación (elimina de la vista visible y actualiza contadores)
-  const handleDismissAlert = (alert) => {
-    dismissAlert(alert.id)
-    setStatusMessage(`Notificación descartada para ${alert.droneName} y retirada de la lista visible.`)
+  const handleOpenResolveModal = (alert) => {
+    setResolvingAlert(alert)
+    setResolutionNote(alert.notasResolucion || '')
   }
 
-  // Marcar como vista individualmente
+  const handleConfirmResolve = async (e) => {
+    e.preventDefault()
+    if (!resolvingAlert) return
+    setIsSavingResolution(true)
+    try {
+      await resolveAlertIncident(resolvingAlert.id, 'guard', resolutionNote)
+      setStatusMessage(
+        `Incidente #${resolvingAlert.eventoId || resolvingAlert.id} marcado como RESUELTO y auditado.`,
+      )
+      setResolvingAlert(null)
+      setResolutionNote('')
+    } catch (error) {
+      setStatusMessage(error?.message || 'No se pudo cerrar el incidente en el servidor.')
+    } finally {
+      setIsSavingResolution(false)
+    }
+  }
+
+  const handleDismissAlert = (alert) => {
+    dismissAlert(alert.id)
+    setStatusMessage(`Notificación #${alert.id} descartada de tu bandeja y sincronizada.`)
+  }
+
   const handleToggleViewed = (alert) => {
     if (!alert.viewedBy?.guard) {
       markAsViewed(alert.id)
-      setStatusMessage(`Alerta ${alert.droneName} marcada como vista. Contador actualizado.`)
+      setStatusMessage(`Alerta #${alert.id} marcada como vista en el servidor.`)
     }
   }
 
   return (
     <div className="alertas-guardia-page">
       <div className="alertas-guardia-shell">
-        {/* ============================================================== */}
-        {/* 1. ENCABEZADO Y ESTADO DEL SISTEMA                             */}
-        {/* ============================================================== */}
         <header className="alertas-guardia-header">
           <div className="alertas-guardia-brand">
             <img
@@ -190,22 +240,20 @@ export default function GuardiaAlertas() {
 
           <div className="alertas-guardia-header-actions">
             <span className="alertas-guardia-status-pill" title="Patrullaje perimetral activo">
+              <span className="alertas-guardia-status-dot" aria-hidden="true" />
               En patrullaje
             </span>
             <button
               type="button"
               className="alertas-guardia-notification-button"
               aria-label="Notificaciones del sistema"
-              onClick={() => setStatusMessage(`Notificaciones activas. ${pendingAlertsCount} nuevas sin visualizar.`)}
+              onClick={handleBellClick}
             >
               <HeaderBellIcon />
             </button>
           </div>
         </header>
 
-        {/* ============================================================== */}
-        {/* 2. TARJETA INFORMATIVA: MONITOREO PERIMETRAL ACTIVO            */}
-        {/* ============================================================== */}
         <section className="alertas-guardia-monitor" aria-label="Monitoreo perimetral activo">
           <div className="alertas-guardia-monitor__left">
             <div className="alertas-guardia-monitor__icon" aria-hidden="true">
@@ -219,9 +267,6 @@ export default function GuardiaAlertas() {
           <span className="alertas-guardia-monitor__sla">99.9% SLA</span>
         </section>
 
-        {/* ============================================================== */}
-        {/* 3. BARRA DE FILTROS CON CONTADORES DINÁMICOS                   */}
-        {/* ============================================================== */}
         <div className="alertas-guardia-filters" role="tablist" aria-label="Filtros de incidentes">
           {filterDefinitions.map((filter) => {
             const isActive = activeFilter === filter.id
@@ -246,7 +291,6 @@ export default function GuardiaAlertas() {
           })}
         </div>
 
-        {/* Barra auxiliar de control de demostración del contador de no vistas */}
         <div className="alertas-guardia-quick-toolbar">
           <span className="alertas-guardia-quick-toolbar__status">
             {pendingAlertsCount > 0
@@ -260,7 +304,7 @@ export default function GuardiaAlertas() {
                 className="alertas-guardia-quick-toolbar__btn"
                 onClick={() => {
                   markAllAsViewed()
-                  setStatusMessage('Todas las alertas marcadas como vistas. El contador se ha actualizado a 0.')
+                  setStatusMessage('Todas las alertas marcadas como vistas en el servidor.')
                 }}
               >
                 Marcar todas vistas
@@ -269,17 +313,16 @@ export default function GuardiaAlertas() {
             <button
               type="button"
               className="alertas-guardia-quick-toolbar__btn"
-              onClick={async () => {
-                await resetDemo()
-                setStatusMessage('Alertas sincronizadas desde el servidor.')
+              onClick={() => {
+                resetDemo()
+                setStatusMessage('Bandeja sincronizada con el servidor.')
               }}
             >
-              Sincronizar alertas
+              Sincronizar
             </button>
           </div>
         </div>
 
-        {/* Notificación o banner de estado de la última interacción */}
         {statusMessage && (
           <div className="alertas-guardia-status-banner" role="status">
             <span>{statusMessage}</span>
@@ -294,9 +337,6 @@ export default function GuardiaAlertas() {
           </div>
         )}
 
-        {/* ============================================================== */}
-        {/* 4. LISTA DE NOTIFICACIONES                                     */}
-        {/* ============================================================== */}
         <main className="alertas-guardia-list" aria-live="polite">
           {visibleAlerts.length > 0 ? (
             visibleAlerts.map((alert) => {
@@ -309,10 +349,8 @@ export default function GuardiaAlertas() {
                   className="alertas-guardia-card"
                   aria-label={`Alerta ${alert.severityLabel} detectada por ${alert.droneName}`}
                 >
-                  {/* Encabezado de la tarjeta */}
                   <header className="alertas-guardia-card__header">
                     <div className="alertas-guardia-card__identity">
-                      {/* Avatar circular con mini-badge editable */}
                       <div className="alertas-guardia-card__avatar-wrap">
                         <div
                           className={`alertas-guardia-card__avatar ${
@@ -335,11 +373,12 @@ export default function GuardiaAlertas() {
                         </span>
                       </div>
 
-                      {/* Identificación del dron, antigüedad y ubicación */}
                       <div className="alertas-guardia-card__meta">
                         <div className="alertas-guardia-card__title-row">
                           <strong className="alertas-guardia-card__title">{alert.droneName}</strong>
-                          <span className="alertas-guardia-card__time">· {alert.age}</span>
+                          <span className="alertas-guardia-card__time">
+                            · {alert.age} · {alert.status}
+                          </span>
                         </div>
                         <span className="alertas-guardia-card__location">
                           <MapPinIcon />
@@ -349,7 +388,6 @@ export default function GuardiaAlertas() {
                     </div>
 
                     <div className="alertas-guardia-card__header-right">
-                      {/* Estado de visualización independiente y accionable */}
                       <button
                         type="button"
                         className={`alertas-guardia-card__seen-indicator ${
@@ -363,7 +401,6 @@ export default function GuardiaAlertas() {
                         {isViewed ? 'Vista' : 'Nueva'}
                       </button>
 
-                      {/* Nivel de severidad con colores oficiales */}
                       <span
                         className={`alertas-guardia-card__severity ${
                           isCritical
@@ -376,7 +413,6 @@ export default function GuardiaAlertas() {
                     </div>
                   </header>
 
-                  {/* Recuadro de imagen con etiquetas superpuestas independientes */}
                   <div className="alertas-guardia-card__image-container">
                     <img
                       src={alert.image}
@@ -384,9 +420,7 @@ export default function GuardiaAlertas() {
                       className="alertas-guardia-card__image"
                     />
 
-                    {/* Capa superpuesta con telemetría y confianza IA */}
                     <div className="alertas-guardia-card__image-overlay">
-                      {/* Fila superior: Detección y confianza IA */}
                       <div className="alertas-guardia-card__overlay-row">
                         <span className="alertas-guardia-card__tag alertas-guardia-card__tag--dark">
                           <span
@@ -411,7 +445,6 @@ export default function GuardiaAlertas() {
                         </span>
                       </div>
 
-                      {/* Fila inferior: Coordenadas, altitud y hora */}
                       <div className="alertas-guardia-card__telemetry-row">
                         <span className="alertas-guardia-card__telemetry-pill">
                           {alert.coordinates}
@@ -424,7 +457,6 @@ export default function GuardiaAlertas() {
                     </div>
                   </div>
 
-                  {/* Recuadro de descripción del incidente */}
                   <div className="alertas-guardia-card__description-box">
                     <div
                       className={`alertas-guardia-card__description-heading ${
@@ -443,7 +475,12 @@ export default function GuardiaAlertas() {
                       {alert.description}
                     </div>
 
-                    {/* Registro Criptográfico Inmutable (cuando aplique) */}
+                    {alert.notasResolucion && (
+                      <div style={{ marginTop: '6px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
+                        ✓ Nota de cierre: {alert.notasResolucion}
+                      </div>
+                    )}
+
                     {alert.audit && (
                       <div className="alertas-guardia-card__audit">
                         <span className="alertas-guardia-card__audit-badge">
@@ -457,7 +494,6 @@ export default function GuardiaAlertas() {
                     )}
                   </div>
 
-                  {/* Botones de acción principales */}
                   <div className="alertas-guardia-card__actions">
                     <button
                       type="button"
@@ -469,21 +505,52 @@ export default function GuardiaAlertas() {
                       Ver en Vivo
                     </button>
 
-                    <button
-                      type="button"
-                      className={`alertas-guardia-card__btn ${
-                        isCritical
-                          ? 'alertas-guardia-card__btn--dispatch-critical'
-                          : 'alertas-guardia-card__btn--dispatch-dark'
-                      }`}
-                      onClick={() => handleDispatch(alert)}
-                    >
-                      {isCritical ? <BeaconIcon /> : <DispatchNavIcon />}
-                      Despachar Guardia
-                    </button>
+                    {alert.resolved ? (
+                      <button
+                        type="button"
+                        className="alertas-guardia-card__btn alertas-guardia-card__btn--dispatch-dark"
+                        disabled
+                        style={{ opacity: 0.75 }}
+                      >
+                        <ShieldCheckIcon />
+                        Incidente Resuelto
+                      </button>
+                    ) : alert.dispatched ? (
+                      <button
+                        type="button"
+                        className="alertas-guardia-card__btn alertas-guardia-card__btn--dispatch-dark"
+                        onClick={() => handleOpenResolveModal(alert)}
+                      >
+                        <ShieldCheckIcon />
+                        Marcar como Resuelto
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`alertas-guardia-card__btn ${
+                          isCritical
+                            ? 'alertas-guardia-card__btn--dispatch-critical'
+                            : 'alertas-guardia-card__btn--dispatch-dark'
+                        }`}
+                        onClick={() => handleDispatch(alert)}
+                      >
+                        {isCritical ? <BeaconIcon /> : <DispatchNavIcon />}
+                        Despachar Guardia
+                      </button>
+                    )}
                   </div>
 
-                  {/* Descartar notificación */}
+                  {!alert.resolved && !alert.dispatched && (
+                    <button
+                      type="button"
+                      className="alertas-guardia-card__dismiss-btn"
+                      style={{ color: '#0369a1', marginBottom: '2px' }}
+                      onClick={() => handleOpenResolveModal(alert)}
+                    >
+                      ✓ Marcar como Resuelto
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     className="alertas-guardia-card__dismiss-btn"
@@ -507,9 +574,91 @@ export default function GuardiaAlertas() {
           )}
         </main>
 
-        {/* ============================================================== */}
-        {/* 5. BARRA DE NAVEGACIÓN INFERIOR DE GUARDIA                     */}
-        {/* ============================================================== */}
+        {resolvingAlert && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="guardia-resolve-title"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.55)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: '16px',
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setResolvingAlert(null)
+            }}
+          >
+            <form
+              onSubmit={handleConfirmResolve}
+              style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                padding: '20px',
+                maxWidth: '400px',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <strong id="guardia-resolve-title" style={{ fontSize: '16px', color: '#0f172a' }}>
+                Resolver Incidente #{resolvingAlert.eventoId || resolvingAlert.id}
+              </strong>
+              <label style={{ fontSize: '13px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span>Reporte operativo de resolución:</span>
+                <textarea
+                  rows={3}
+                  value={resolutionNote}
+                  onChange={(e) => setResolutionNote(e.target.value)}
+                  placeholder="Describe la acción realizada en campo..."
+                  style={{
+                    width: '100%',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 10px',
+                    fontSize: '13px',
+                  }}
+                />
+              </label>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setResolvingAlert(null)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingResolution}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#15803d',
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isSavingResolution ? 'Guardando…' : 'Confirmar Cierre'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         <GuardiaBottomNav activePath="/guardia/alertas" />
       </div>
     </div>

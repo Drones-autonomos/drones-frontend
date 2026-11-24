@@ -193,19 +193,34 @@
     grid-column: 1 / -1;
   }
 
-  body .live-content > .live-preview-section {
+  /* Columnas envueltas: la izquierda (video + progreso) se estira a la
+     altura del rail y el video absorbe el espacio sobrante. */
+  body .live-content > .live-media-col {
     grid-column: 1;
-    grid-row: span 3;
+    grid-row: 2;
+    align-self: stretch;
   }
 
-  body .live-content > .telemetry-grid {
+  body .live-content > .live-rail-col {
     grid-column: 2;
+    grid-row: 2;
+  }
+
+  body .live-media-col > .live-preview-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body .live-media-col .live-preview {
+    flex: 1 1 auto;
+    aspect-ratio: auto;
+    min-height: 420px;
+  }
+
+  body .live-rail-col > .telemetry-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  body .live-content > .quick-actions,
-  body .live-content > .heliport-card {
-    grid-column: 2;
   }
 
   /* ------------------------------------------------------------------
@@ -285,8 +300,19 @@
 
   /* Cada grupo (título + tarjeta) es una celda del grid; perfil,
      edición, logout y demás hijos directos van a lo ancho */
-  body .ajustes-content > :not(.ajustes-group) {
+  body .ajustes-content > :not(.ajustes-group):not(.ajustes-col) {
     grid-column: 1 / -1;
+  }
+
+  /* Columnas envueltas (como live-media-col/live-rail-col): cada una es
+     una celda del grid y apila sus grupos de forma independiente, así la
+     columna derecha no hereda la altura de la izquierda ni viceversa. */
+  body .ajustes-content > .ajustes-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-self: start;
   }
 
   /* ------------------------------------------------------------------
@@ -294,6 +320,32 @@
      ------------------------------------------------------------------ */
   body .ajustes-modal-card {
     width: min(100%, 560px);
+  }
+
+  /* ------------------------------------------------------------------
+     10. ESCALA VISUAL UNIFICADA — Alertas y En Vivo
+     Alertas nació con escala móvil (~11px de cuerpo) y En Vivo con una
+     ~2× (~22px). Se convergen a la escala de consola (~14-16px). `zoom`
+     escala tipografía, paddings e iconos a la vez; va por hijo del shell
+     para no tocar el sidebar fijo ni el modal de parada (su backdrop
+     `inset:0` no cubriría el viewport dentro de un contenedor zoomeado).
+     Estas páginas no montan Leaflet → no desplaza clics de mapa.
+     ------------------------------------------------------------------ */
+  body .alertas-guardia-shell > :not(.guardia-bottom-nav),
+  body .alertas-shell > :not(.admin-bottom-nav) {
+    zoom: 1.18;
+  }
+
+  body .admin-live-page
+    > :not(.admin-bottom-nav):not(.guardia-bottom-nav):not(.emergency-modal-backdrop) {
+    zoom: 0.8;
+  }
+
+  /* En Vivo: suelo de legibilidad para las etiquetas más pequeñas
+     (11px × 0.8 ≈ 8.8px → ~11px renderizados). */
+  body .admin-live-page .live-header__signal small,
+  body .admin-live-page .preview-demo-note {
+    font-size: 14px;
   }
 }
 

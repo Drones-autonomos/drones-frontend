@@ -1,16 +1,16 @@
 import { useEffect } from 'react'
 import { StopIcon } from './EnVivoIcons.jsx'
 
-export function EmergencyStopModal({ isOpen, onClose, onConfirm, isLoading = false }) {
+export function EmergencyStopModal({ isOpen, onClose, onConfirm, isLoading = false, error = null }) {
   useEffect(() => {
     function handleKeyDown(event) {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === 'Escape' && isOpen && !isLoading) {
         onClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, isLoading, onClose])
 
   if (!isOpen) return null
 
@@ -21,7 +21,7 @@ export function EmergencyStopModal({ isOpen, onClose, onConfirm, isLoading = fal
       aria-modal="true"
       aria-labelledby="emergency-modal-title"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
+        if (e.target === e.currentTarget && !isLoading) onClose()
       }}
     >
       <div className="emergency-modal">
@@ -30,8 +30,16 @@ export function EmergencyStopModal({ isOpen, onClose, onConfirm, isLoading = fal
         </div>
         <h3 id="emergency-modal-title">¿Confirmar Parada Inmediata?</h3>
         <p>
-          Esta acción activará el mecanismo de seguridad de emergencia del controlador de vuelo y detendrá de inmediato la operación del dron.
+          Esta acción ordenará la parada de emergencia real: el dron aterrizará de inmediato en su posición actual (modo LAND) y quedará registrada en la bitácora de vuelos.
         </p>
+        {error && (
+          <p
+            style={{ color: '#be123c', fontWeight: 700, marginBottom: 18 }}
+            role="alert"
+          >
+            {error}
+          </p>
+        )}
         <div className="emergency-modal__actions">
           <button
             className="emergency-modal__btn emergency-modal__btn--cancel"

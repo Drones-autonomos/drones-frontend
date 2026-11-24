@@ -7,24 +7,73 @@ export const BITACORA_STORAGE_KEY = 'aeroluferan_bitacora_flights'
 export const BITACORA_SYNCED_KEY = 'aeroluferan_bitacora_synced'
 export const MAX_RETENTION_DAYS = 30
 
+function getConfiguredRetentionDays() {
+  if (typeof window === 'undefined') return MAX_RETENTION_DAYS
+  try {
+    const raw = localStorage.getItem('aeroluferan_settings')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.retentionDays === 'number' && parsed.retentionDays > 0) {
+        return parsed.retentionDays
+      }
+    }
+  } catch {
+    // ignore malformed local cache
+  }
+  return MAX_RETENTION_DAYS
+}
+
 /**
- * Calcula dinámicamente los días restantes de retención de una grabación según su fecha de almacenamiento.
- * Regla 14: Las grabaciones solamente están disponibles durante 30 días.
+ * Calcula dinámicamente los días restantes de retención de una grabación según
+ * los metadatos reales del backend (`expiresAt` / `daysRemaining`) o el periodo
+ * normativo configurado en Ajustes (30 / 60 / 90 días).
  */
-export function calculateRetention(storedAt, retentionDays = MAX_RETENTION_DAYS) {
-  const storedDate = new Date(storedAt)
-  const now = new Date()
-  const diffMs = now.getTime() - storedDate.getTime()
-  const elapsedDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  const daysRemaining = retentionDays - elapsedDays
+export function calculateRetention(storedAt, options = undefined) {
+  const videoMeta = typeof options === 'object' && options !== null ? options : null
+  const configuredDays =
+    typeof options === 'number' && options > 0
+      ? options
+      : typeof videoMeta?.retentionDays === 'number' && videoMeta.retentionDays > 0
+        ? videoMeta.retentionDays
+        : getConfiguredRetentionDays()
+
+  if (videoMeta?.isPurged) {
+    return {
+      isExpired: true,
+      daysRemaining: 0,
+      configuredDays,
+      label: 'Grabación purgada',
+      statusType: 'expired',
+      description: `El archivo fue purgado conforme a la política de ${configuredDays} días; se conserva el sello SHA-256.`,
+    }
+  }
+
+  let daysRemaining
+  if (videoMeta?.expiresAt) {
+    const expDate = new Date(videoMeta.expiresAt)
+    if (!Number.isNaN(expDate.getTime())) {
+      daysRemaining = Math.max(0, Math.ceil((expDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    }
+  }
+  if (daysRemaining === undefined && typeof videoMeta?.daysRemaining === 'number') {
+    daysRemaining = Math.max(0, Math.round(videoMeta.daysRemaining))
+  }
+  if (daysRemaining === undefined) {
+    const storedDate = new Date(storedAt)
+    const now = new Date()
+    const diffMs = now.getTime() - storedDate.getTime()
+    const elapsedDays = Number.isNaN(storedDate.getTime()) ? 0 : Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    daysRemaining = configuredDays - elapsedDays
+  }
 
   if (daysRemaining <= 0) {
     return {
       isExpired: true,
       daysRemaining: 0,
+      configuredDays,
       label: 'Grabación expirada',
       statusType: 'expired',
-      description: 'El video ha superado el periodo de retención de 30 días.',
+      description: `El video ha superado el periodo de retención de ${configuredDays} días.`,
     }
   }
 
@@ -32,6 +81,7 @@ export function calculateRetention(storedAt, retentionDays = MAX_RETENTION_DAYS)
     return {
       isExpired: false,
       daysRemaining: 1,
+      configuredDays,
       label: 'Último día',
       statusType: 'critical',
       description: 'La grabación expirará hoy a la medianoche.',
@@ -42,6 +92,7 @@ export function calculateRetention(storedAt, retentionDays = MAX_RETENTION_DAYS)
     return {
       isExpired: false,
       daysRemaining,
+      configuredDays,
       label: `${daysRemaining} días restantes`,
       statusType: 'warning',
       description: `Quedan ${daysRemaining} días antes del vencimiento del video.`,
@@ -51,9 +102,10 @@ export function calculateRetention(storedAt, retentionDays = MAX_RETENTION_DAYS)
   return {
     isExpired: false,
     daysRemaining,
+    configuredDays,
     label: `${daysRemaining} días restantes`,
     statusType: 'normal',
-    description: `Grabación respaldada durante ${daysRemaining} días más.`,
+    description: `Grabación respaldada durante ${daysRemaining} días más (ciclo ${configuredDays}d).`,
   }
 }
 

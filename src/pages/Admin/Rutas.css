@@ -28,7 +28,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px 14px;
+  padding: 16px 20px 14px;
   background: #ffffff;
   border-bottom: 1px solid #edf2f7;
   position: sticky;
@@ -49,7 +49,7 @@
 
 .rutas-brand-title {
   margin: 0;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
   color: #172f52;
   line-height: 1.15;
@@ -770,8 +770,12 @@
 
 .missions-empty-note {
   margin: 0;
-  padding: 14px;
-  font-size: 12px;
+  padding: 32px 20px;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   color: #64748b;
   text-align: center;
   background: #f8fafc;

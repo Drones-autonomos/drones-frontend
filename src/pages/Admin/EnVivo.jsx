@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
 import DroneVideoPlayer from '../../components/DroneVideoPlayer.jsx'
+import MissionProgressPanel from '../../components/MissionProgressPanel.jsx'
 import EmergencyStopModal from '../../components/EmergencyStopModal.jsx'
 import {
   AltitudeIcon,
@@ -25,13 +26,14 @@ import {
   startMission,
 } from '../../services/missionService.js'
 import droneControlService from '../../services/droneControlService.js'
-import { refreshTelemetry } from '../../services/telemetryService.js'
+import aeroluferanLogo from '../../assets/aeroluferan-logo.png'
+import { refreshTelemetry, selectChargingBase } from '../../services/telemetryService.js'
 import {
-  requestArmFailsafe,
   requestEmergencyStop,
   requestPauseFlight,
   requestResumeFlight,
   requestReturnToBase,
+  requestSetFailsafe,
 } from './droneCommands.js'
 import './EnVivo.css'
 
@@ -85,7 +87,7 @@ function TelemetryCard({ item }) {
   )
 }
 
-function QuickActions({ mode, isPaused, missionEstado, missionBusy, onStartMission, onConfirmLanded, onStartPreset, onScheduleRoute, onTogglePause, onReturnToBase, onArmFailsafe, onRequestEmergencyStop, actionMessage }) {
+function QuickActions({ mode, isPaused, missionEstado, missionBusy, droneConnected, canReturnToBase, connectionBusy, failsafeEnabled, failsafeBusy, onStartMission, onConfirmLanded, onStartPreset, onScheduleRoute, onTogglePause, onReturnToBase, onToggleFailsafe, onToggleConnection, onRequestEmergencyStop, actionMessage }) {
   return (
     <section className="quick-actions" aria-labelledby="quick-actions-title">
       <div className="quick-actions__heading">
@@ -164,6 +166,7 @@ function QuickActions({ mode, isPaused, missionEstado, missionBusy, onStartMissi
           className="drone-action"
           type="button"
           onClick={onReturnToBase}
+          disabled={!canReturnToBase}
         >
           <span className="drone-action__icon">
             <HomeIcon />
@@ -174,12 +177,37 @@ function QuickActions({ mode, isPaused, missionEstado, missionBusy, onStartMissi
         <button
           className="drone-action"
           type="button"
-          onClick={onArmFailsafe}
+          onClick={onToggleFailsafe}
+          disabled={failsafeBusy || !droneConnected}
         >
           <span className="drone-action__icon">
             <ShieldIcon />
           </span>
-          <span>Armar Failsafe GCS</span>
+          <span>
+            {failsafeBusy
+              ? 'Actualizando Failsafe…'
+              : failsafeEnabled
+                ? 'Failsafe GCS Activo'
+                : 'Armar Failsafe GCS'}
+          </span>
+        </button>
+
+        <button
+          className="drone-action"
+          type="button"
+          onClick={onToggleConnection}
+          disabled={connectionBusy}
+        >
+          <span className="drone-action__icon">
+            <PlaneIcon />
+          </span>
+          <span>
+            {connectionBusy
+              ? 'Procesando MAVLink…'
+              : droneConnected
+                ? 'Desconectar MAVLink'
+                : 'Conectar MAVLink'}
+          </span>
         </button>
 
         {(missionEstado === 'EN_CURSO' || isPaused) && (
@@ -205,7 +233,14 @@ function QuickActions({ mode, isPaused, missionEstado, missionBusy, onStartMissi
   )
 }
 
-function HeliportCard({ heliport }) {
+function stationLabel(station) {
+  if (station.station_id === 'helipuerto_norte') return 'Base Norte'
+  if (station.station_id === 'helipuerto_sur') return 'Base Sur'
+  return station.nombre || station.codigo || station.station_id
+}
+
+function HeliportCard({ heliport, onSelectStation, stationBusy }) {
+  const stations = heliport.stations || []
   return (
     <section className="heliport-card" aria-label="Estado del helipuerto">
       <div className="heliport-card__main">
@@ -224,6 +259,34 @@ function HeliportCard({ heliport }) {
           {heliport.protectionDome}
         </span>
         <strong>{heliport.landingStatus}</strong>
+        {stations.length > 0 && (
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {stations.map((station) => {
+              const active = station.station_id === heliport.stationId
+              return (
+                <button
+                  key={station.station_id}
+                  type="button"
+                  disabled={stationBusy || active}
+                  onClick={() => onSelectStation(station.station_id)}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 999,
+                    padding: '5px 10px',
+                    font: 'inherit',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: active ? '#fff' : '#334155',
+                    background: active ? '#0f766e' : '#fff',
+                  }}
+                >
+                  {stationLabel(station)}
+                </button>
+              )
+            })}
+          </span>
+        )}
       </div>
     </section>
   )
@@ -231,14 +294,20 @@ function HeliportCard({ heliport }) {
 
 function EnVivo() {
   const navigate = useNavigate()
-  const { drone, flight, preview, cards, quickActions, heliport } = useDroneTelemetry()
+  const { drone, flight, preview, cards, quickActions, heliport, link, raw } = useDroneTelemetry()
   const { streamUrl, isLive, connectionState, info: streamInfo } = useLiveVideoStream()
+  const droneConnected = Boolean(link?.droneConnected)
+  const canReturnToBase = droneConnected && Boolean(flight.armed)
+  const isPaused = Boolean(flight.isPaused)
 
-  const [isPaused, setIsPaused] = useState(Boolean(flight.isPaused))
   const [actionMessage, setActionMessage] = useState('')
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
   const [isEmergencyStopping, setIsEmergencyStopping] = useState(false)
+  const [emergencyError, setEmergencyError] = useState('')
   const [missionBusy, setMissionBusy] = useState(false)
+  const [connectionBusy, setConnectionBusy] = useState(false)
+  const [failsafeBusy, setFailsafeBusy] = useState(false)
+  const [stationBusy, setStationBusy] = useState(false)
 
   async function handleStartMission() {
     if (!flight.missionId) return
@@ -297,13 +366,9 @@ function EnVivo() {
   async function handleTogglePause() {
     try {
       setActionMessage('')
-      if (isPaused) {
-        await requestResumeFlight()
-        setIsPaused(false)
-      } else {
-        await requestPauseFlight()
-        setIsPaused(true)
-      }
+      const result = isPaused ? await requestResumeFlight() : await requestPauseFlight()
+      setActionMessage(result?.status || (isPaused ? 'Vuelo reanudado.' : 'Vuelo pausado.'))
+      await refreshTelemetry()
     } catch (error) {
       setActionMessage(
         error instanceof Error ? error.message : 'No se pudo pausar o reanudar el vuelo.',
@@ -312,9 +377,15 @@ function EnVivo() {
   }
 
   async function handleReturnToBase() {
+    if (!canReturnToBase) {
+      setActionMessage('El dron debe estar conectado y en vuelo para regresar a base.')
+      return
+    }
     try {
       setActionMessage('')
-      await requestReturnToBase(heliport?.stationNumber || '01')
+      const result = await requestReturnToBase(heliport?.stationId)
+      setActionMessage(result?.status || `Regreso ordenado hacia ${heliport?.name || 'la base'}.`)
+      await refreshTelemetry()
     } catch (error) {
       setActionMessage(
         error instanceof Error ? error.message : 'No se pudo ordenar el regreso a base.',
@@ -322,33 +393,81 @@ function EnVivo() {
     }
   }
 
-  async function handleArmFailsafe() {
+  async function handleToggleFailsafe() {
+    const nextEnabled = !flight.failsafeGcs
     try {
+      setFailsafeBusy(true)
       setActionMessage('')
-      const result = await requestArmFailsafe()
+      await requestSetFailsafe(nextEnabled)
       setActionMessage(
-        result?.message || 'Failsafe GCS armado: el dron volverá a base si pierde el enlace.',
+        nextEnabled
+          ? 'Failsafe GCS activado: el dron volverá a base si pierde el enlace.'
+          : 'Failsafe GCS desactivado.',
       )
+      await refreshTelemetry()
     } catch (error) {
       setActionMessage(
-        error instanceof Error ? error.message : 'No se pudo armar el failsafe GCS.',
+        error instanceof Error ? error.message : 'No se pudo actualizar el failsafe GCS.',
       )
+    } finally {
+      setFailsafeBusy(false)
     }
+  }
+
+  async function handleToggleConnection() {
+    try {
+      setConnectionBusy(true)
+      setActionMessage('')
+      const result = droneConnected
+        ? await droneControlService.disconnect()
+        : await droneControlService.connect()
+      setActionMessage(result?.status || (droneConnected ? 'MAVLink desconectado.' : 'MAVLink conectado.'))
+      await refreshTelemetry()
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo actualizar la conexión MAVLink.',
+      )
+    } finally {
+      setConnectionBusy(false)
+    }
+  }
+
+  async function handleSelectStation(stationId) {
+    try {
+      setStationBusy(true)
+      setActionMessage('')
+      const station = await selectChargingBase(stationId)
+      setActionMessage(`Estación activa: ${station?.nombre || stationId}.`)
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo seleccionar la estación.',
+      )
+    } finally {
+      setStationBusy(false)
+    }
+  }
+
+  function closeEmergencyModal() {
+    if (isEmergencyStopping) return
+    setEmergencyError('')
+    setIsEmergencyModalOpen(false)
   }
 
   async function handleConfirmEmergencyStop() {
     try {
       setIsEmergencyStopping(true)
       setActionMessage('')
-      await requestEmergencyStop()
+      setEmergencyError('')
+      const result = await requestEmergencyStop()
+      setActionMessage(result?.status || 'Parada de emergencia ejecutada.')
+      await refreshTelemetry()
       setIsEmergencyModalOpen(false)
     } catch (error) {
-      setActionMessage(
+      setEmergencyError(
         error instanceof Error ? error.message : 'No se pudo ejecutar la parada inmediata.',
       )
     } finally {
       setIsEmergencyStopping(false)
-      setIsEmergencyModalOpen(false)
     }
   }
 
@@ -357,13 +476,15 @@ function EnVivo() {
       {/* Encabezado Superior */}
       <header className="live-header">
         <div className="live-header__brand">
-          <span className="live-header__drone-icon">
-            <PlaneIcon />
-          </span>
+          <img
+            className="live-header__logo"
+            src={aeroluferanLogo}
+            alt="Emblema AeroLuferan"
+          />
           <div className="live-header__brand-copy">
             <h1>{drone.name}</h1>
             <span>
-              {drone.model} <i /> <b>{isPaused ? 'Vuelo Pausado' : (drone.patrolStatus || 'En Patrullaje')}</b>
+              {drone.model} <i /> <b>{isPaused ? 'Vuelo Pausado' : (drone.patrolStatus || '—')}</b>
             </span>
           </div>
         </div>
@@ -373,48 +494,68 @@ function EnVivo() {
       <main className="live-content">
         <FlightCard flight={flight} />
 
-        {/* Reproductor de video en vivo (MJPEG del backend) */}
-        <DroneVideoPlayer
-          streamUrl={streamUrl}
-          isLive={isLive}
-          connectionState={connectionState}
-          preview={{
-            ...preview,
-            resolution: streamInfo
-              ? `${streamInfo.resolucion} ${streamInfo.fps}fps`
-              : preview.resolution,
-          }}
-        />
+        {/* Columna izquierda: video que crece + progreso de misión */}
+        <div className="live-media-col">
+          {/* Reproductor de video en vivo (MJPEG del backend) */}
+          <DroneVideoPlayer
+            streamUrl={streamUrl}
+            isLive={isLive}
+            connectionState={connectionState}
+            vueloId={flight.missionId}
+            preview={{
+              ...preview,
+              resolution: streamInfo
+                ? `${streamInfo.resolucion} ${streamInfo.fps}fps`
+                : preview.resolution,
+            }}
+          />
 
-        {/* Cuatro tarjetas de telemetría */}
-        <section
-          className="telemetry-grid"
-          aria-label="Telemetría en tiempo real del dron"
-        >
-          {cards.map((item) => (
-            <TelemetryCard key={item.id} item={item} />
-          ))}
-        </section>
+          {/* Progreso de la misión: ocupa la columna bajo el video */}
+          <MissionProgressPanel mission={raw?.mission} />
+        </div>
 
-        {/* Acciones Rápidas */}
-        <QuickActions
-          mode={quickActions?.mode || flight.mode}
-          isPaused={isPaused}
-          missionEstado={flight.missionEstado}
-          missionBusy={missionBusy}
-          onStartMission={handleStartMission}
-          onConfirmLanded={handleConfirmLanded}
-          onStartPreset={handleStartPreset}
-          onScheduleRoute={handleScheduleRoute}
-          onTogglePause={handleTogglePause}
-          onReturnToBase={handleReturnToBase}
-          onArmFailsafe={handleArmFailsafe}
-          onRequestEmergencyStop={() => setIsEmergencyModalOpen(true)}
-          actionMessage={actionMessage}
-        />
+        {/* Columna derecha: rail de telemetría y acciones */}
+        <div className="live-rail-col">
+          {/* Cuatro tarjetas de telemetría */}
+          <section
+            className="telemetry-grid"
+            aria-label="Telemetría en tiempo real del dron"
+          >
+            {cards.map((item) => (
+              <TelemetryCard key={item.id} item={item} />
+            ))}
+          </section>
 
-        {/* Tarjeta de Helipuerto */}
-        <HeliportCard heliport={heliport} />
+          {/* Acciones Rápidas */}
+          <QuickActions
+            mode={quickActions?.mode || flight.mode}
+            isPaused={isPaused}
+            missionEstado={flight.missionEstado}
+            missionBusy={missionBusy}
+            droneConnected={droneConnected}
+            canReturnToBase={canReturnToBase}
+            connectionBusy={connectionBusy}
+            failsafeEnabled={Boolean(flight.failsafeGcs)}
+            failsafeBusy={failsafeBusy}
+            onStartMission={handleStartMission}
+            onConfirmLanded={handleConfirmLanded}
+            onStartPreset={handleStartPreset}
+            onScheduleRoute={handleScheduleRoute}
+            onTogglePause={handleTogglePause}
+            onReturnToBase={handleReturnToBase}
+            onToggleFailsafe={handleToggleFailsafe}
+            onToggleConnection={handleToggleConnection}
+            onRequestEmergencyStop={() => setIsEmergencyModalOpen(true)}
+            actionMessage={actionMessage}
+          />
+
+          {/* Tarjeta de Helipuerto */}
+          <HeliportCard
+            heliport={heliport}
+            onSelectStation={handleSelectStation}
+            stationBusy={stationBusy}
+          />
+        </div>
       </main>
 
       {/* Navegación Inferior de Admin */}
@@ -424,7 +565,8 @@ function EnVivo() {
       <EmergencyStopModal
         isOpen={isEmergencyModalOpen}
         isLoading={isEmergencyStopping}
-        onClose={() => setIsEmergencyModalOpen(false)}
+        error={emergencyError}
+        onClose={closeEmergencyModal}
         onConfirm={handleConfirmEmergencyStop}
       />
     </div>

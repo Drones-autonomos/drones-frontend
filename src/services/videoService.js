@@ -1,42 +1,63 @@
 /**
- * Servicio de Video en Vivo del dron para AeroLuferan.
- * Consume los endpoints MJPEG del backend:
- *   GET /video/stream-info  → estado y métricas del stream
- *   GET /video/live         → stream MJPEG (multipart/x-mixed-replace)
- *   GET /video/snapshot     → último frame JPEG
+ * Servicio de Video en Vivo y Evidencia Visual del dron para AeroLuferan.
+ * Consume los endpoints autenticados del backend:
+ *   GET  /video/stream-info       → estado, perfil de calidad y métricas del stream
+ *   GET  /video/live?token=...    → stream MJPEG (multipart/x-mixed-replace)
+ *   GET  /video/snapshot?token=.. → último frame JPEG
+ *   POST /video/capture-evidence  → captura, anonimiza rostros y sella SHA-256 en BD
  */
 
-import { apiClient, buildApiUrl } from './apiClient.js'
+import { apiClient, buildApiUrl, getAuthToken } from './apiClient.js'
 
 /**
  * Consulta el estado del stream de video en el backend.
- * Retorna { stream_url, protocolo, estado_camara, resolucion, fps,
- *           frames_publicados, reconexiones, ultimo_frame_at }.
- * Lanza ApiError si el backend no responde.
  */
 export function getStreamInfo() {
   return apiClient.get('/video/stream-info', { skipAuthRedirect: true })
 }
 
-/** URL del stream MJPEG para usar en <img src>. */
+/** URL autenticada del stream MJPEG para usar en <img src>. */
 export function getLiveStreamUrl() {
-  return buildApiUrl('/video/live')
+  const token = getAuthToken()
+  return buildApiUrl('/video/live', token ? { token } : undefined)
 }
 
-/** URL del último frame JPEG para usar en <img src> o descarga. */
+/** URL autenticada del último frame JPEG para usar en <img src> o descarga. */
 export function getSnapshotUrl() {
-  return buildApiUrl('/video/snapshot')
+  const token = getAuthToken()
+  return buildApiUrl('/video/snapshot', token ? { token } : undefined)
 }
 
 /**
- * Captura el último frame del stream y lo descarga como evidencia JPEG.
- * El archivo se nombra captura-AAAAMMDD-HHMMSS.jpg.
+ * Sella el frame actual en el backend con SHA-256 + coordenadas GPS (con difuminado facial)
+ * y descarga además la copia JPEG local al operador.
  */
-export async function captureSnapshotFrame() {
-  const blob = await apiClient.get('/video/snapshot', {
-    responseType: 'blob',
-    skipAuthRedirect: true,
-  })
+export async function captureSnapshotFrame({ vueloId = null } = {}) {
+  let evidenceMeta = null
+  if (getAuthToken()) {
+    try {
+      evidenceMeta = await apiClient.post('/video/capture-evidence', null, {
+        query: {
+          ...(vueloId != null ? { vuelo_id: vueloId } : {}),
+          blur_faces: true,
+        },
+        skipAuthRedirect: true,
+      })
+    } catch {
+      evidenceMeta = null
+    }
+  }
+
+  const blob = evidenceMeta?.id
+    ? await apiClient.get(`/detections/${evidenceMeta.id}/frame`, {
+        responseType: 'blob',
+        skipAuthRedirect: true,
+      })
+    : await apiClient.get('/video/snapshot', {
+        responseType: 'blob',
+        skipAuthRedirect: true,
+      })
+
   const now = new Date()
   const pad = (n) => String(n).padStart(2, '0')
   const stamp =
@@ -48,11 +69,12 @@ export async function captureSnapshotFrame() {
   anchor.download = `captura-${stamp}.jpg`
   anchor.click()
   URL.revokeObjectURL(url)
+
+  return evidenceMeta
 }
 
 /**
  * Indica si el stream reporta señal activa según stream-info.
- * El backend expone /video/live solo cuando hay frames publicados.
  */
 export function isStreamActive(info) {
   if (!info) return false

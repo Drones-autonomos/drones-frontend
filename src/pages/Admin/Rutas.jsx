@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
+import aeroluferanLogo from '../../assets/aeroluferan-logo.png'
 import {
-  AeroBrandLogo,
   AdjustSliderIcon,
   AutonomousFlightIcon,
   BatteryChargeIcon,
@@ -33,12 +33,14 @@ import {
 import {
   listMissions,
   startMission,
+  retryMission,
   cancelMission,
   confirmMissionLanded,
   deleteMission,
   getSchedulerStatus,
   setSchedulerEnabled,
   MISSIONS_UPDATED_EVENT,
+  RETRYABLE_ESTADOS,
 } from '../../services/missionService.js'
 import {
   syncGeofences,
@@ -253,7 +255,8 @@ export default function Rutas() {
       return
     }
 
-    if (selectedMission.estado !== 'PROGRAMADA') {
+    const isRetryable = RETRYABLE_ESTADOS.has(selectedMission.estado)
+    if (selectedMission.estado !== 'PROGRAMADA' && !isRetryable) {
       setFlightStatusMessage({
         type: 'error',
         text: `La misión "${selectedMission.name}" está en estado ${selectedMission.estado} y no puede iniciarse.`,
@@ -282,7 +285,9 @@ export default function Rutas() {
 
     try {
       setPendingActionId(selectedMission.id)
-      const started = await startMission(selectedMission.id)
+      const started = isRetryable
+        ? await retryMission(selectedMission.id)
+        : await startMission(selectedMission.id)
       setFlightStatusMessage({
         type: 'success',
         text: `Misión "${started.name}" en ejecución. Redirigiendo a monitoreo En Vivo...`,
@@ -561,7 +566,11 @@ export default function Rutas() {
         {/* ============================================================== */}
         <header className="rutas-header">
           <div className="rutas-brand">
-            <AeroBrandLogo size={38} />
+            <img
+              src={aeroluferanLogo}
+              alt="Emblema AeroLuferan"
+              style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0 }}
+            />
             <div className="rutas-brand-text">
               <h1 className="rutas-brand-title">AeroLuferan</h1>
               <div className="rutas-brand-subtitle">
@@ -719,7 +728,8 @@ export default function Rutas() {
             disabled={
               !selectedMission ||
               pendingActionId !== null ||
-              !['PROGRAMADA', 'EN_CURSO'].includes(selectedMission.estado)
+              (!['PROGRAMADA', 'EN_CURSO'].includes(selectedMission.estado) &&
+                !RETRYABLE_ESTADOS.has(selectedMission.estado))
             }
           >
             {!selectedMission
@@ -728,7 +738,9 @@ export default function Rutas() {
                 ? 'Monitorear En Vivo'
                 : selectedMission.estado === 'PROGRAMADA'
                   ? pendingActionId === selectedMission.id ? 'Iniciando…' : 'Iniciar Vuelo'
-                  : `Misión ${selectedMission.statusBadge || selectedMission.estado}`}
+                  : RETRYABLE_ESTADOS.has(selectedMission.estado)
+                    ? pendingActionId === selectedMission.id ? 'Reiniciando…' : `Reintentar Misión (${selectedMission.statusBadge || selectedMission.estado})`
+                    : `Misión ${selectedMission.statusBadge || selectedMission.estado}`}
           </button>
 
           {/* ============================================================== */}

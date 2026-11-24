@@ -1,7 +1,16 @@
 /**
  * Configuración, estado y servicios para el módulo Ajustes de AeroLuferan.
  * Preparado para conectarse con backend, base de datos, agente de IA y sistema del dron.
+ *
+ * Persistencia: localStorage actúa como caché inmediato; la fuente de verdad
+ * compartida es el backend (GET/PUT /settings/operator, tabla ajustes_operativos).
  */
+
+import {
+  fetchOperatorSettings,
+  fetchUserPreferences,
+  updateOperatorSettings,
+} from '../../services/settingsService.js'
 
 export const AJUSTES_STORAGE_KEY = 'aeroluferan_settings'
 
@@ -73,30 +82,6 @@ export const DEFAULT_SETTINGS = {
     description: 'Cifrado de flujo activo en reposo y tránsito conforme a normativa institucional.',
   },
   transmissionQualityId: 'fhd-60',
-  helipads: [
-    {
-      id: 'heli-norte-01',
-      name: 'Helipuerto Base Norte #01',
-      isConnected: true,
-      connectionStatus: 'Conectada',
-      chargingStatus: 'Carga Inductiva lista',
-      batteryLevel: 100,
-      temperature: '24°C',
-      domeStatus: 'Abierto / Listo',
-      voltage: '48.2 V',
-    },
-    {
-      id: 'heli-sur-02',
-      name: 'Helipuerto Base Sur #02 (Secundario)',
-      isConnected: true,
-      connectionStatus: 'En espera',
-      chargingStatus: 'Pad de inducción en reposo',
-      batteryLevel: 95,
-      temperature: '22°C',
-      domeStatus: 'Cerrado',
-      voltage: '47.8 V',
-    },
-  ],
 }
 
 /**
@@ -107,6 +92,9 @@ export function getStoredSettings() {
     const raw = localStorage.getItem(AJUSTES_STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
+      // Sanea el caché: `helipads` contenía estaciones inventadas; las
+      // estaciones reales se consultan en GET /drone/charging-bases.
+      delete parsed.helipads
       return { ...DEFAULT_SETTINGS, ...parsed }
     }
   } catch (error) {
@@ -117,6 +105,9 @@ export function getStoredSettings() {
 
 /**
  * Guarda los ajustes actualizados y notifica a las interfaces suscritas.
+ * Escribe el caché localStorage de inmediato y devuelve la promesa real de
+ * persistencia en el backend para que la UI pueda mostrar errores honestos
+ * (4xx/5xx). Si el backend está offline resuelve con el objeto local.
  */
 export function saveSettings(settings) {
   try {
@@ -125,6 +116,42 @@ export function saveSettings(settings) {
   } catch (error) {
     console.error('Error al guardar ajustes:', error)
   }
-  return settings
+  return updateOperatorSettings(settings).catch((error) => {
+    console.error('No se pudieron persistir los ajustes en el servidor:', error?.message || error)
+    if (error?.isOffline || error?.status === 0) return settings
+    throw error
+  })
+}
+
+/**
+ * Carga inicial desde el backend: consulta GET /settings/operator y, si
+ * responde, mergea los ajustes operativos sobre el caché local + defaults.
+ * Encima aplica las preferencias personales del usuario (GET /auth/me →
+ * preferencias: push críticas y calidad de transmisión por usuario, así las
+ * opciones de GUARDIA también persisten entre dispositivos).
+ * Reescribe localStorage y notifica a las vistas suscritas
+ * (aeroluferan_settings_updated). Si el backend no responde retorna null y
+ * se conserva el caché local. No dispara PUT (es solo sincronización de lectura).
+ */
+export async function syncSettingsFromBackend() {
+  const remote = await fetchOperatorSettings()
+  const userPrefs = await fetchUserPreferences()
+  if (!remote && !userPrefs) return null
+  // Las preferencias personales solo se aplican a `criticalPushEnabled`
+  // (preferencia por usuario). Sensibilidad IA, retención y calidad de
+  // transmisión son ajustes GLOBALES de la fila ajustes_operativos: nunca se
+  // sobrescriben con preferencias locales o por-usuario obsoletas.
+  const personalPrefs =
+    userPrefs && userPrefs.criticalPushEnabled !== undefined
+      ? { criticalPushEnabled: userPrefs.criticalPushEnabled }
+      : {}
+  const merged = { ...getStoredSettings(), ...(remote || {}), ...personalPrefs }
+  try {
+    localStorage.setItem(AJUSTES_STORAGE_KEY, JSON.stringify(merged))
+    window.dispatchEvent(new CustomEvent('aeroluferan_settings_updated', { detail: merged }))
+  } catch (error) {
+    console.error('Error al sincronizar ajustes desde el servidor:', error)
+  }
+  return merged
 }
 

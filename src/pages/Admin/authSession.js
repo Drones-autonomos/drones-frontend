@@ -50,8 +50,9 @@ export const DEFAULT_GUARD_USER = {
 }
 
 /**
- * Transforma UserResponse del backend ({id, nombre, email, activo, rol, created_at})
- * al formato de sesión consumido por las vistas Admin y Guardia.
+ * Transforma UserResponse del backend ({id, nombre, email, activo, rol,
+ * puesto, foto_url, preferencias, created_at}) al formato de sesión
+ * consumido por las vistas Admin y Guardia.
  */
 export function mapBackendUserToSession(profile, token, previousSession = null) {
   const backendRoleName = profile?.rol?.nombre || 'GUARDIA'
@@ -72,12 +73,14 @@ export function mapBackendUserToSession(profile, token, previousSession = null) 
     email: profile.email,
     activo: Boolean(profile.activo),
     position:
+      profile?.puesto ||
       (sameUser && previousSession?.customPosition) ||
       profile?.rol?.descripcion ||
       (isAdmin ? 'Administrador Académico' : 'Guardia de Seguridad'),
-    customPosition: sameUser ? previousSession?.customPosition || null : null,
+    customPosition: profile?.puesto || (sameUser ? previousSession?.customPosition || null : null),
     credentialStatus: profile.activo ? 'Credencial Activa' : 'Cuenta Inactiva',
-    photoUrl: sameUser ? previousSession?.photoUrl || null : null,
+    photoUrl: profile?.foto_url || (sameUser ? previousSession?.photoUrl || null : null),
+    preferencias: profile?.preferencias || null,
     permissions: isAdmin
       ? ['flight:view', 'flight:schedule', 'flight:audit', 'geofence:edit', 'users:write', 'settings:edit']
       : ['flight:view', 'flight:control_emergency', 'alerts:resolve'],
@@ -156,12 +159,17 @@ export function setCurrentUser(user) {
 
 /**
  * Inicia sesión real contra POST /auth/login y obtiene el perfil real con GET /auth/me.
+ * expectedRole ('ADMIN' | 'GUARDIA') se envía cuando el usuario eligió
+ * explícitamente una tarjeta de acceso; el backend responde 403 si la cuenta
+ * pertenece al otro rol.
  */
-export async function loginUser({ email, password }) {
+export async function loginUser({ email, password, expectedRole }) {
   const cleanEmail = String(email || '').trim()
+  const payload = { email: cleanEmail, password }
+  if (expectedRole) payload.expected_role = expectedRole
   const tokenResp = await apiClient.post(
     '/auth/login',
-    { email: cleanEmail, password },
+    payload,
     { auth: false, skipAuthRedirect: true },
   )
 
@@ -196,9 +204,48 @@ export async function fetchCurrentUser() {
   return updated
 }
 
+// Persistencia debounced del perfil contra PATCH /auth/me para no disparar
+// una petición por cada tecla al editar nombre/puesto en vivo. Las promesas
+// devueltas por updateUserProfile se resuelven/rechazan al concluir el flush.
+let _profilePersistTimer = null
+let _profilePersistWaiters = []
+const PROFILE_PERSIST_DEBOUNCE_MS = 700
+
+function _flushProfilePersist(sessionUser) {
+  const waiters = _profilePersistWaiters
+  _profilePersistWaiters = []
+  apiClient
+    .patch(
+      '/auth/me',
+      {
+        nombre: sessionUser.name,
+        puesto: sessionUser.position ?? sessionUser.customPosition ?? null,
+        foto_url: sessionUser.photoUrl ?? null,
+      },
+      { skipAuthRedirect: true },
+    )
+    .then((profile) => {
+      const refreshed = mapBackendUserToSession(profile, sessionUser.token, sessionUser)
+      setCurrentUser(refreshed)
+      waiters.forEach(({ resolve }) => resolve(refreshed))
+    })
+    .catch((error) => {
+      console.error('No se pudo persistir el perfil en el servidor:', error?.message || error)
+      // Offline (status 0): la copia local ya fue aplicada — se resuelve sin
+      // error para no generar toasts falsos cuando el backend no responde.
+      if (error?.isOffline || error?.status === 0) {
+        waiters.forEach(({ resolve }) => resolve(sessionUser))
+      } else {
+        waiters.forEach(({ reject }) => reject(error))
+      }
+    })
+}
+
 /**
- * Actualiza metadatos locales de visualización de perfil (foto o cargo local)
- * preservando el correo institucional y token JWT.
+ * Actualiza el perfil del usuario: aplica los cambios de inmediato en la sesión
+ * local y los persiste en el backend (PATCH /auth/me) con debounce.
+ * Devuelve una promesa que se resuelve con la sesión persistida (o la copia
+ * local si el backend está offline) y rechaza si el servidor responde 4xx/5xx.
  */
 export function updateUserProfile(updates) {
   const current = getCurrentUser()
@@ -213,17 +260,58 @@ export function updateUserProfile(updates) {
     customPosition: allowedUpdates.position ?? current.customPosition ?? null,
     email: current.email,
   }
-  if (current.token) {
-    setCurrentUser(updated)
+  if (!current.token) {
+    return Promise.resolve(updated)
   }
+  setCurrentUser(updated)
+  if (_profilePersistTimer) clearTimeout(_profilePersistTimer)
+  const promise = new Promise((resolve, reject) => {
+    _profilePersistWaiters.push({ resolve, reject })
+  })
+  _profilePersistTimer = setTimeout(() => {
+    _profilePersistTimer = null
+    _flushProfilePersist(updated)
+  }, PROFILE_PERSIST_DEBOUNCE_MS)
+  return promise
+}
+
+/**
+ * Cambia la contraseña del usuario autenticado contra POST /auth/change-password.
+ * El backend revoca el token en uso; la sesión local queda inválida después.
+ */
+export async function changePassword({ currentPassword, newPassword }) {
+  return apiClient.post('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  })
+}
+
+/**
+ * Renueva el JWT de la sesión activa contra POST /auth/refresh.
+ */
+export async function refreshSessionToken() {
+  const current = getStoredSession()
+  if (!current?.token) return null
+  const response = await apiClient.post('/auth/refresh', {})
+  const newToken = response?.access_token
+  if (!newToken) return null
+  const updated = { ...current, token: newToken }
+  setCurrentUser(updated)
   return updated
 }
 
 /**
- * Cierra la sesión activa y limpia aeroluferan_session.
+ * Cierra la sesión activa: revoca el JWT en el servidor (POST /auth/logout,
+ * best-effort) y limpia aeroluferan_session.
  */
 export function logoutUser() {
   try {
+    const token = getStoredSession()?.token
+    if (token) {
+      apiClient
+        .post('/auth/logout', {}, { token, skipAuthRedirect: true })
+        .catch(() => {})
+    }
     localStorage.removeItem(SESSION_STORAGE_KEY)
     window.dispatchEvent(new CustomEvent('aeroluferan_session_changed', { detail: null }))
   } catch (error) {
@@ -245,10 +333,72 @@ export function getRegisteredUsers() {
 }
 
 /**
- * Registra un nuevo usuario en el backend vía POST /auth/register (requiere rol ADMIN).
- * rol_id: 1 = ADMIN, 2 = GUARDIA. No reemplaza la sesión activa del administrador.
+ * Lista los usuarios reales del backend (GET /users/, solo ADMIN).
+ * Los mapea al formato de tarjeta que consume Usuarios.jsx.
  */
-export async function registerUser({ nombre, name, email, password, role, rol_id }) {
+export async function fetchUsersAdmin({ q, rolId, activo } = {}) {
+  const query = {}
+  if (q) query.q = q
+  if (rolId !== undefined && rolId !== null) query.rol_id = rolId
+  if (activo !== undefined && activo !== null) query.activo = activo
+  const users = await apiClient.get('/users/', { query })
+  return (users || []).map((u) => ({
+    id: u.id,
+    nombre: u.nombre,
+    name: u.nombre,
+    email: u.email,
+    puesto: u.puesto || null,
+    fotoUrl: u.foto_url || null,
+    activo: Boolean(u.activo),
+    rolId: u.rol?.id ?? null,
+    rolNombre: u.rol?.nombre || 'GUARDIA',
+    role: normalizeRole(u.rol?.nombre || 'GUARDIA'),
+    rolDescripcion: u.rol?.descripcion || null,
+    createdAt: u.created_at,
+  }))
+}
+
+/**
+ * Actualiza un usuario desde el panel de administración (PATCH /users/{id}).
+ * Acepta { nombre, puesto, rol_id, activo }.
+ */
+export async function updateUserAdmin(userId, updates) {
+  return apiClient.patch(`/users/${userId}`, updates)
+}
+
+/**
+ * Restablece la contraseña de un usuario (POST /users/{id}/reset-password).
+ */
+export async function resetUserPasswordAdmin(userId, newPassword) {
+  return apiClient.post(`/users/${userId}/reset-password`, { new_password: newPassword })
+}
+
+/**
+ * Da de baja lógica a un usuario (DELETE /users/{id} → activo=false).
+ */
+export async function deleteUserAdmin(userId) {
+  return apiClient.delete(`/users/${userId}`)
+}
+
+/**
+ * Lista los roles disponibles (GET /users/roles, solo ADMIN).
+ * Devuelve un mapa { NOMBRE: id } para resolver dinámicamente los IDs.
+ */
+export async function fetchRolesAdmin() {
+  const roles = await apiClient.get('/users/roles')
+  const map = {}
+  for (const rol of roles || []) {
+    map[String(rol.nombre).toUpperCase()] = rol.id
+  }
+  return map
+}
+
+/**
+ * Registra un nuevo usuario en el backend vía POST /auth/register (requiere rol ADMIN).
+ * Acepta { nombre|name, email, password, role|rol_id, puesto }.
+ * No reemplaza la sesión activa del administrador.
+ */
+export async function registerUser({ nombre, name, email, password, role, rol_id, puesto }) {
   const finalName = String(nombre ?? name ?? '').trim()
   const finalEmail = String(email ?? '').trim().toLowerCase()
   const resolvedRoleId =
@@ -263,6 +413,7 @@ export async function registerUser({ nombre, name, email, password, role, rol_id
     email: finalEmail,
     password,
     rol_id: resolvedRoleId,
+    ...(puesto ? { puesto: String(puesto).trim() } : {}),
   })
 
   upsertKnownUser(created)

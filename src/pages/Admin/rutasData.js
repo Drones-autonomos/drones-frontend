@@ -7,11 +7,6 @@
 export const CAMPUS_CENTER = [20.7032, -100.4435]
 export const CAMPUS_DEFAULT_ZOOM = 17
 
-export const HELIPUERTOS = [
-  'Helipuerto Base Norte',
-  'Helipuerto Base Sur',
-]
-
 export const GEOFENCES_STORAGE_KEY = 'aeroluferan_geofences'
 
 /**

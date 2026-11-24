@@ -1,0 +1,12 @@
+<script>
+  const p = new URLSearchParams(location.search);
+  const session = {
+    id: Number(p.get('uid') || 3),
+    role: p.get('role') || 'guard',
+    name: p.get('name') || 'Seguridad UAQ',
+    email: p.get('email') || 'seguridad@uaq.mx',
+    token: p.get('token') || ''
+  };
+  localStorage.setItem('aeroluferan_session', JSON.stringify(session));
+  location.replace(p.get('next') || '/');
+</script>

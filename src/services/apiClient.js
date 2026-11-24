@@ -6,12 +6,20 @@
 
 export const SESSION_STORAGE_KEY = 'aeroluferan_session'
 
+// En dev (sin VITE_API_URL) se usa URL relativa → same-origin → vite proxy
+// (/api → localhost:8000) — evita CORS al abrir la app desde otro puerto/host.
 export const API_URL = (
-  import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined'
+    ? `${window.location.origin}/api/v1`
+    : 'http://localhost:8000/api/v1')
 ).replace(/\/+$/, '')
 
 export const WS_URL = (
-  import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1'
+  import.meta.env.VITE_WS_URL ||
+  (typeof window !== 'undefined'
+    ? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/api/v1`
+    : 'ws://localhost:8000/api/v1')
 ).replace(/\/+$/, '')
 
 export class ApiError extends Error {
@@ -61,6 +69,32 @@ export function clearSessionAndRedirect() {
   if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
     window.location.replace('/')
   }
+}
+
+/**
+ * Normaliza un error de API a un mensaje breve en español apto para la UI.
+ * Prioriza el `detail` parseado del backend en 4xx; en fallos de red o 5xx
+ * devuelve un mensaje genérico honesto (sin inventar causas).
+ */
+export function describeApiError(error, fallback = 'No se pudo completar la operación.') {
+  if (!error) return fallback
+  if (error.isOffline || error.status === 0) {
+    return 'Sin conexión con el servidor backend.'
+  }
+  const status = error.status ?? 0
+  if (status >= 500) {
+    return 'Error interno del servidor. Intenta de nuevo más tarde.'
+  }
+  // 4xx: el detalle del backend suele ser descriptivo; solo caer al mapa de
+  // estados cuando el mensaje es el genérico "Error HTTP N".
+  if (error.message && error.message !== `Error HTTP ${status}`) {
+    return error.message
+  }
+  if (status === 401) return 'Sesión no válida o expirada.'
+  if (status === 403) return 'Operación no permitida para el rol asignado.'
+  if (status === 404) return 'El recurso solicitado no existe en el servidor.'
+  if (status === 429) return 'Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.'
+  return fallback
 }
 
 export function parseApiErrorDetail(payload, fallback = 'Error en la solicitud al servidor.') {

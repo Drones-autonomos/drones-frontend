@@ -9,39 +9,30 @@
 }
 
 .live-header {
-  min-height: 124px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  padding: 18px 40px;
-  border-bottom: 2px solid #e8eaff;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid #edf2f7;
   background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
 .live-header__brand {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
 }
 
-.live-header__drone-icon {
-  position: relative;
-  width: 76px;
-  height: 76px;
-  flex: 0 0 76px;
-  display: grid;
-  place-items: center;
-  border: 4px solid #0074ad;
-  border-radius: 50%;
-  color: #0074ad;
-}
-
-.live-header__drone-icon svg {
-  width: 40px;
-  height: 40px;
-  fill: currentColor;
+.live-header__logo {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  object-fit: contain;
 }
 
 .live-header__brand-copy {
@@ -54,10 +45,10 @@
 .live-header__brand-copy > h1 {
   overflow: hidden;
   margin: 0;
-  color: #151d2f;
-  font-size: 34px;
-  font-weight: 750;
-  letter-spacing: -.5px;
+  color: #172f52;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.3px;
   line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -66,18 +57,19 @@
 .live-header__brand-copy > span {
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: #5a6069;
-  font-size: 23px;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1.3;
   white-space: nowrap;
 }
 
 .live-header__brand-copy i {
-  width: 7px;
-  height: 7px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: #5b6268;
+  background: #94a3b8;
 }
 
 .live-header__brand-copy b {
@@ -92,6 +84,15 @@
   flex-direction: column;
   gap: 31px;
   padding: 30px 40px 88px;
+}
+
+/* Columnas envueltas del layout desktop (en móvil apilan en orden) */
+.live-media-col,
+.live-rail-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 31px;
 }
 
 .flight-card {
@@ -191,6 +192,20 @@
   border-radius: 0;
 }
 
+.live-preview__media {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  transform-origin: 0 0;
+  touch-action: none;
+  cursor: grab;
+  will-change: transform;
+}
+
+.live-preview__media.is-zoomed {
+  cursor: grabbing;
+}
+
 .live-preview__image {
   position: absolute;
   z-index: -2;
@@ -206,6 +221,7 @@
   inset: 0;
   background: linear-gradient(180deg, rgb(19 35 41 / 24%), transparent 29%, transparent 64%, rgb(20 30 17 / 27%));
   content: '';
+  pointer-events: none;
 }
 
 .preview-topline {
@@ -217,6 +233,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  pointer-events: none;
 }
 
 .preview-live-indicator,
@@ -278,6 +295,7 @@
   text-align: center;
   white-space: nowrap;
   backdrop-filter: blur(5px);
+  pointer-events: none;
 }
 
 .preview-crosshair {
@@ -290,6 +308,7 @@
   place-items: center;
   border: 4px dashed rgb(255 255 255 / 83%);
   border-radius: 28px;
+  pointer-events: none;
 }
 
 .preview-crosshair span {
@@ -309,6 +328,7 @@
   align-items: center;
   gap: 13px;
   padding: 10px 20px;
+  pointer-events: none;
   transform: translateX(-50%);
   border: 1px solid rgb(228 232 237 / 90%);
   border-radius: 999px;
@@ -353,6 +373,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
+  pointer-events: none;
 }
 
 .preview-reading {
@@ -434,8 +455,26 @@
   stroke-width: 2.4;
 }
 
+.preview-zoom-reset {
+  position: absolute;
+  right: 22px;
+  bottom: 96px;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(50 56 13 / 70%);
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .preview-capture:focus-visible,
 .preview-fullscreen:focus-visible,
+.preview-zoom-reset:focus-visible,
 .drone-action:focus-visible {
   outline: 3px solid #007eb4;
   outline-offset: 3px;
@@ -787,46 +826,24 @@
 
 @media (max-width: 620px) {
   .live-header {
-    min-height: 93px;
     gap: 8px;
-    padding: 13px 20px;
-  }
-
-  .live-header__brand {
-    gap: 12px;
-  }
-
-  .live-header__drone-icon {
-    width: 57px;
-    height: 57px;
-    flex-basis: 57px;
-    border-width: 3px;
-  }
-
-  .live-header__drone-icon svg {
-    width: 32px;
-    height: 32px;
-  }
-
-  .live-header__brand-copy > h1 {
-    font-size: clamp(20px, 5vw, 27px);
+    padding: 12px 16px 10px;
   }
 
   .live-header__brand-copy > span {
     gap: 6px;
-    row-gap: 2px;
     flex-wrap: wrap;
-    font-size: clamp(13px, 3.4vw, 17px);
-  }
-
-  .live-header__brand-copy i {
-    width: 5px;
-    height: 5px;
+    white-space: normal;
   }
 
   .live-content {
     gap: 20px;
     padding: 20px 20px 96px;
+  }
+
+  .live-media-col,
+  .live-rail-col {
+    gap: 20px;
   }
 
   .flight-card {
@@ -1127,12 +1144,6 @@
     gap: 8px;
   }
 
-  .live-header__drone-icon {
-    width: 48px;
-    height: 48px;
-    flex-basis: 48px;
-  }
-
   .live-content {
     padding-right: 12px;
     padding-left: 12px;
@@ -1302,4 +1313,221 @@
 @keyframes scaleIn {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* ------------------------------------------------------------------
+   Progreso de misión: timeline de waypoints bajo el video (desktop col 1)
+   ------------------------------------------------------------------ */
+.mission-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 27px;
+  border: 2px solid #e9eaff;
+  border-radius: 40px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgb(34 45 77 / 6%);
+}
+
+.mission-progress__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mission-progress__title-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mission-progress__title-wrap h2 {
+  margin: 0;
+  color: #151d2f;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.mission-progress__mission-name {
+  overflow: hidden;
+  color: #5a6069;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mission-progress__badge {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.mission-progress__badge--en-curso {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.mission-progress__badge--cancelando {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.mission-progress__badge--recuperacion {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.mission-progress__empty {
+  margin: 0;
+  color: #5a6069;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.mission-progress__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef0f8;
+}
+
+.mission-progress__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0f766e;
+  transition: width .4s ease;
+}
+
+.mission-progress__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mission-progress__item {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.mission-progress__item:not(:last-child)::before {
+  position: absolute;
+  top: 40px;
+  bottom: -6px;
+  left: 15px;
+  width: 2px;
+  background: #e2e8f0;
+  content: '';
+}
+
+.mission-progress__item--done:not(:last-child)::before {
+  background: #0f766e;
+}
+
+.mission-progress__node {
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #cbd5e1;
+  border-radius: 50%;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mission-progress__node svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mission-progress__item--done .mission-progress__node {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #fff;
+}
+
+.mission-progress__item--current .mission-progress__node {
+  border-color: #0284c7;
+  color: #0284c7;
+  box-shadow: 0 0 0 4px rgb(2 132 199 / 15%);
+}
+
+.mission-progress__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+.mission-progress__wp {
+  color: #1d273b;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.mission-progress__item--current .mission-progress__wp {
+  color: #0284c7;
+}
+
+.mission-progress__meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #5a6069;
+  font-size: 12.5px;
+}
+
+.mission-progress__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eef0f8;
+}
+
+.mission-progress__pager-btn {
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.mission-progress__pager-btn:hover:not(:disabled) {
+  border-color: #0284c7;
+  color: #0284c7;
+  background: #f0f9ff;
+}
+
+.mission-progress__pager-btn:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.mission-progress__pager-info {
+  color: #5a6069;
+  font-size: 12.5px;
+  font-weight: 650;
 }

@@ -1,7 +1,1 @@
 @import '../../Admin/Rutas.css';
-
-/* Ajustes específicos para el perfil de Guardia */
-.rutas-header .rutas-brand img {
-  border-radius: 50%;
-  background: #eef2f6;
-}

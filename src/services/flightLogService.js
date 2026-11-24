@@ -1,32 +1,25 @@
 /**
- * Servicio de Bitácora de Vuelos para AeroLuferan.
+ * Servicio de Bitácora de Vuelos e Integridad Criptográfica para AeroLuferan.
  * Compone el historial de vuelos a partir de los endpoints reales del backend:
- *   GET /missions/          → vuelos (misiones ejecutadas o programadas)
- *   GET /telemetry/log      → métricas agregadas por misión
- *   GET /recordings/        → grabaciones cifradas (stream/download + purga 30d)
- *   GET /events/{id}        → incidencias con detecciones asociadas
- *
- * Persiste el resultado en localStorage y emite 'aeroluferan_bitacora_updated'
- * para que las pantallas de Bitácora (Admin/Guardia) se refresquen solas.
+ *   GET /flight-logs/            → bitácora inmutable con cadena SHA-256 y operador real
+ *   GET /flight-logs/{id}/verify → verificación criptográfica en servidor
+ *   GET /missions/               → vuelos (misiones ejecutadas o programadas)
+ *   GET /telemetry/log           → métricas agregadas por misión
+ *   GET /recordings/             → grabaciones cifradas (stream con HTTP Range + purga normativa)
+ *   GET /events/                 → incidencias con detecciones asociadas
  */
 
-import apiClient, { getAuthToken } from './apiClient.js'
-import campusReference from '../assets/campus-reference.svg'
+import apiClient, { buildApiUrl, getAuthToken } from './apiClient.js'
 import { BITACORA_SYNCED_KEY } from '../pages/Admin/bitacoraData.js'
 
 export const BITACORA_UPDATED_EVENT = 'aeroluferan_bitacora_updated'
 export const MAX_RETENTION_DAYS = 30
 
-let syncState = 'idle' // 'idle' | 'syncing' | 'connected' | 'offline' | 'unauthenticated'
-const recordingBlobCache = new Map()
+let syncState = 'idle'
 
 export function getFlightLogSyncState() {
   return syncState
 }
-
-/* ==========================================================================
-   Utilidades de formato y geometría
-   ========================================================================== */
 
 function haversineMeters(p1, p2) {
   const [lat1, lon1] = p1
@@ -74,10 +67,6 @@ const MISSION_STATE_LABELS = {
   RECUPERACION: 'En recuperación',
 }
 
-/* ==========================================================================
-   Mapeo de telemetría agregada por misión
-   ========================================================================== */
-
 function aggregateTelemetry(entries) {
   const ordered = [...entries].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
   const last = ordered[ordered.length - 1] || null
@@ -85,6 +74,7 @@ function aggregateTelemetry(entries) {
   let distanceMeters = 0
   let maxAltitude = null
   let maxSpeedMs = null
+  let maxWindKmH = null
   const points = []
 
   ordered.forEach((e) => {
@@ -99,10 +89,19 @@ function aggregateTelemetry(entries) {
     if (typeof e.velocidad_tierra_ms === 'number') {
       maxSpeedMs = maxSpeedMs === null ? e.velocidad_tierra_ms : Math.max(maxSpeedMs, e.velocidad_tierra_ms)
     }
+    if (typeof e.viento_velocidad_kmh === 'number') {
+      maxWindKmH = maxWindKmH === null ? e.viento_velocidad_kmh : Math.max(maxWindKmH, e.viento_velocidad_kmh)
+    }
   })
 
   const battery = typeof last?.bateria_porcentaje === 'number' ? Math.round(last.bateria_porcentaje) : null
   const distanceKm = distanceMeters / 1000
+  const windDisplay =
+    maxWindKmH !== null
+      ? `Viento: ${Math.round(maxWindKmH)} km/h`
+      : maxSpeedMs !== null
+        ? `Vel. máx: ${(maxSpeedMs * 3.6).toFixed(0)} km/h`
+        : 'Viento: —'
 
   return {
     battery: battery !== null ? `${battery}% Batería` : '— Batería',
@@ -111,15 +110,11 @@ function aggregateTelemetry(entries) {
     distanceKm,
     altitude: maxAltitude !== null ? `Alt: ${Math.round(maxAltitude)} m` : 'Alt: —',
     altitudeMeters: maxAltitude,
-    wind: maxSpeedMs !== null ? `Vel. máx: ${(maxSpeedMs * 3.6).toFixed(0)} km/h` : 'Vel: —',
-    windSpeedKmH: maxSpeedMs !== null ? maxSpeedMs * 3.6 : null,
+    wind: windDisplay,
+    windSpeedKmH: maxWindKmH ?? (maxSpeedMs !== null ? maxSpeedMs * 3.6 : null),
     samples: entries.length,
   }
 }
-
-/* ==========================================================================
-   Mapeo de incidencias (eventos + detecciones) por vuelo
-   ========================================================================== */
 
 function mapIncidentFromEvent(eventDetail) {
   const det = eventDetail.detecciones?.[0] || {}
@@ -131,7 +126,7 @@ function mapIncidentFromEvent(eventDetail) {
     location:
       typeof det.latitud === 'number'
         ? `${Math.abs(det.latitud).toFixed(4)}° N, ${Math.abs(det.longitud).toFixed(4)}° W`
-        : 'Zona de patrullaje',
+        : '—',
     timestamp: toDate(eventDetail.created_at)?.toTimeString().slice(0, 5) || '—',
     aiConfidence:
       typeof det.nivel_confianza === 'number' ? `${(det.nivel_confianza * 100).toFixed(1)}%` : '—',
@@ -151,41 +146,51 @@ function buildIncidentBadge(incidents) {
   }
 }
 
-/* ==========================================================================
-   Composición del vuelo (tarjeta de Bitácora)
-   ========================================================================== */
-
-function composeFlight(mission, { recordings = [], telemetry = [], incidents = [] }) {
+function composeFlight(mission, { recordings = [], telemetry = [], incidents = [], flightLog = null }) {
   const recording = recordings[0] || null
   const tele = aggregateTelemetry(telemetry)
-  const startIso = mission.iniciada_at || telemetry[telemetry.length - 1]?.timestamp
-  const endIso = mission.finalizada_at || recording?.fecha_grabacion
+  const startIso = mission.iniciada_at || flightLog?.fecha_inicio || telemetry[telemetry.length - 1]?.timestamp
+  const endIso = mission.finalizada_at || flightLog?.fecha_fin || recording?.fecha_grabacion
   const storedAt =
     recording?.fecha_grabacion || endIso || mission.created_at || new Date().toISOString()
-  const estado = String(mission.estado || '').toUpperCase()
+  const estado = String(mission.estado || flightLog?.estado_final || '').toUpperCase()
 
   let durationMinutes = 0
   const start = toDate(startIso)
   const end = toDate(endIso)
   if (start && end && end > start) durationMinutes = Math.round((end - start) / 60000)
+  else if (flightLog?.duracion_segundos) durationMinutes = Math.round(flightLog.duracion_segundos / 60)
   else if (recording?.duracion_segundos) durationMinutes = Math.round(recording.duracion_segundos / 60)
+
+  const operatorName = flightLog?.operador_nombre || 'Piloto automático'
+  const operatorRole =
+    flightLog?.operador_rol || MISSION_STATE_LABELS[estado] || 'Misión'
+
+  const sealHash = flightLog?.hash_sha256 || recording?.checksum_sha256 || null
+  const sealBlock = flightLog?.id
+    ? `Bitácora #${flightLog.id}`
+    : recording?.id
+      ? `Grabación #${recording.id}`
+      : '—'
+  const isPurged = Boolean(recording?.purgado)
 
   return {
     id: `flight-${mission.id}`,
     backendId: mission.id,
+    flightLogId: flightLog?.id ?? null,
     flightNumber: mission.id,
     flightNumberLabel: 'Vuelo',
     flightCode: `#${mission.id}`,
     missionId: `m-${mission.id}`,
     missionName: mission.nombre || `Misión ${mission.id}`,
-    zone: mission.descripcion || 'Campus Juriquilla',
+    zone: mission.descripcion || '—',
     circuitLabel: `· ${mission.nombre || `Misión ${mission.id}`}`,
     estadoMision: estado,
     operator: {
-      name: 'Piloto automático',
-      role: MISSION_STATE_LABELS[estado] || 'Misión',
-      isAutonomous: true,
-      displayText: `Operador: Piloto automático (${MISSION_STATE_LABELS[estado] || 'Misión'})`,
+      name: operatorName,
+      role: operatorRole,
+      isAutonomous: !flightLog?.operador_nombre,
+      displayText: `Operador: ${operatorName} (${operatorRole})`,
     },
     flightDate: (toDate(startIso) || toDate(storedAt) || new Date()).toISOString().slice(0, 10),
     timeStart: toDate(startIso)?.toTimeString().slice(0, 5) || '—',
@@ -195,12 +200,15 @@ function composeFlight(mission, { recordings = [], telemetry = [], incidents = [
     storedAt,
     video: recording
       ? {
-          title: `Video HD Grabado · ${durationMinutes || Math.round(recording.duracion_segundos / 60)} min`,
+          title: isPurged
+            ? 'Video purgado por retención · Sello conservado'
+            : `Video HD Grabado · ${durationMinutes || Math.round(recording.duracion_segundos / 60)} min`,
           resolution: 'MP4 (AES-GCM)',
           durationSeconds: recording.duracion_segundos,
           videoUrl: '',
-          recordingId: recording.id,
-          poster: campusReference,
+          recordingId: isPurged ? null : recording.id,
+          isPurged,
+          poster: null,
           quality: 'HD',
           sizeBytes: recording.tamano_bytes,
           expiresAt: recording.fecha_purga,
@@ -212,38 +220,35 @@ function composeFlight(mission, { recordings = [], telemetry = [], incidents = [
           durationSeconds: 0,
           videoUrl: '',
           recordingId: null,
-          poster: campusReference,
+          isPurged: false,
+          poster: null,
           quality: '—',
         },
     telemetry: tele,
     incidents,
     incidentBadge: buildIncidentBadge(incidents),
-    integrity: recording
+    integrity: sealHash
       ? {
-          hash: `#${recording.checksum_sha256.slice(0, 6).toUpperCase()}... Inmutable`,
-          shortHash: `#${recording.checksum_sha256.slice(0, 6).toUpperCase()}...`,
-          fullHash: recording.checksum_sha256,
-          blockNumber: `Grabación #${recording.id}`,
+          hash: `#${sealHash.slice(0, 6).toUpperCase()}... Inmutable`,
+          shortHash: `#${sealHash.slice(0, 6).toUpperCase()}...`,
+          fullHash: sealHash,
+          prevHash: flightLog?.prev_hash || null,
+          blockNumber: sealBlock,
           isImmutable: true,
-          timestamp: recording.fecha_grabacion,
-          isSimulated: false,
+          timestamp: flightLog?.fecha_inicio || recording?.fecha_grabacion || storedAt,
         }
       : {
           hash: 'Sin sellado criptográfico',
           shortHash: '—',
-          fullHash: 'Sin grabación asociada a este vuelo.',
+          fullHash: 'Sin registro criptográfico asociado a este vuelo.',
+          prevHash: null,
           blockNumber: '—',
           isImmutable: false,
           timestamp: storedAt,
-          isSimulated: false,
         },
-    buttonVariant: recording ? 'solid' : 'soft',
+    buttonVariant: recording && !isPurged ? 'solid' : 'soft',
   }
 }
-
-/* ==========================================================================
-   Sincronización con el backend
-   ========================================================================== */
 
 export async function refreshFlightLog() {
   if (!getAuthToken()) {
@@ -252,10 +257,11 @@ export async function refreshFlightLog() {
   }
   syncState = 'syncing'
   try {
-    const [missions, recordings, events] = await Promise.all([
+    const [missions, recordings, events, flightLogs] = await Promise.all([
       apiClient.get('/missions/', { query: { limit: 100 }, skipAuthRedirect: true }),
-      apiClient.get('/recordings/', { query: { limit: 100 }, skipAuthRedirect: true }).catch(() => []),
+      apiClient.get('/recordings/', { query: { limit: 100, include_purged: true }, skipAuthRedirect: true }).catch(() => []),
       apiClient.get('/events/', { query: { limit: 50 }, skipAuthRedirect: true }).catch(() => []),
+      apiClient.get('/flight-logs/', { query: { limit: 100 }, skipAuthRedirect: true }).catch(() => []),
     ])
 
     const eventDetails = await Promise.all(
@@ -273,6 +279,13 @@ export async function refreshFlightLog() {
       incidentsByFlight[vueloId].push(mapIncidentFromEvent(detail))
     })
 
+    const logsByMission = {}
+    ;(flightLogs || []).forEach((log) => {
+      if (log?.vuelo_id != null && !logsByMission[log.vuelo_id]) {
+        logsByMission[log.vuelo_id] = log
+      }
+    })
+
     const telemetryByMission = await Promise.all(
       (missions || []).map((m) =>
         apiClient
@@ -284,11 +297,22 @@ export async function refreshFlightLog() {
       ),
     )
 
-    const flights = (missions || []).map((mission, idx) =>
+    // Solo vuelos reales: una misión PROGRAMADA (o terminada sin iniciada_at)
+    // todavía no despegó y no es un registro de vuelo.
+    const FLIGHT_STATES = new Set(['EN_CURSO', 'CANCELANDO', 'RECUPERACION'])
+    const flownMissions = (missions || [])
+      .map((mission, idx) => [mission, telemetryByMission[idx] || []])
+      .filter(([mission]) => {
+        const estado = String(mission.estado || '').toUpperCase()
+        return Boolean(mission.iniciada_at) || FLIGHT_STATES.has(estado)
+      })
+
+    const flights = flownMissions.map(([mission, telemetry]) =>
       composeFlight(mission, {
         recordings: (recordings || []).filter((r) => r.vuelo_id === mission.id),
-        telemetry: telemetryByMission[idx] || [],
+        telemetry,
         incidents: incidentsByFlight[mission.id] || [],
+        flightLog: logsByMission[mission.id] || null,
       }),
     )
 
@@ -309,31 +333,41 @@ export async function refreshFlightLog() {
   }
 }
 
-/* ==========================================================================
-   Reproducción y descarga de grabaciones cifradas (vía fetch con Bearer)
-   ========================================================================== */
-
 /**
- * Obtiene una URL de objeto reproducible para la grabación de un vuelo.
- * Descarga el MP4 descifrado como Blob autenticado y lo cachea en memoria.
+ * Retorna la URL directa autenticada con soporte nativo HTTP Range (206 Partial Content).
  */
 export async function getRecordingPlaybackUrl(flight) {
   const recordingId = flight?.video?.recordingId
-  if (!recordingId) return null
-  if (recordingBlobCache.has(recordingId)) return recordingBlobCache.get(recordingId)
-
-  const blob = await apiClient.get(`/recordings/${recordingId}/stream`, {
-    responseType: 'blob',
-  })
-  const url = URL.createObjectURL(blob)
-  recordingBlobCache.set(recordingId, url)
-  return url
+  if (!recordingId || flight?.video?.isPurged) return null
+  const token = getAuthToken()
+  return buildApiUrl(`/recordings/${recordingId}/stream`, token ? { token } : undefined)
 }
 
 /**
- * Descarga el archivo de grabación (endpoint restringido a ADMIN).
+ * Verifica en tiempo real el sello SHA-256 y la cadena previa en el servidor.
+ */
+export async function verifyFlightLogIntegrity(flight) {
+  if (!flight?.flightLogId || !getAuthToken()) return null
+  try {
+    return await apiClient.get(`/flight-logs/${flight.flightLogId}/verify`, {
+      skipAuthRedirect: true,
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Descarga el archivo de grabación (endpoint restringido a ADMIN y auditado).
  */
 export async function downloadRecordingFile(flight) {
+  if (flight?.video?.isPurged) {
+    return {
+      success: false,
+      reason: 'purged',
+      message: 'El video fue purgado por retención normativa; su sello SHA-256 permanece en Bitácora.',
+    }
+  }
   const recordingId = flight?.video?.recordingId
   if (!recordingId) {
     return {
@@ -370,47 +404,29 @@ export async function downloadRecordingFile(flight) {
 }
 
 /**
- * Genera el archivo de auditoría con datos reales de telemetría y grabaciones.
+ * Genera el archivo de auditoría con datos reales de auditoría, bitácora, telemetría y grabaciones.
  */
 export async function generateAuditExportFile() {
-  const [telemetry, recordings] = await Promise.all([
-    apiClient
-      .get('/telemetry/log', { query: { limit: 20 }, skipAuthRedirect: true })
-      .catch(() => []),
-    apiClient.get('/recordings/', { query: { limit: 20 }, skipAuthRedirect: true }).catch(() => []),
+  const [auditExport, flightLogs, telemetry, recordings] = await Promise.all([
+    apiClient.get('/audit/export', { skipAuthRedirect: true }).catch(() => null),
+    apiClient.get('/flight-logs/', { query: { limit: 50 }, skipAuthRedirect: true }).catch(() => []),
+    apiClient.get('/telemetry/log', { query: { limit: 20 }, skipAuthRedirect: true }).catch(() => []),
+    apiClient.get('/recordings/', { query: { limit: 20, include_purged: true }, skipAuthRedirect: true }).catch(() => []),
   ])
 
-  const auditReport = {
+  const auditReport = auditExport || {
     sistema: 'AeroLuferan - Sistema Autónomo de Vigilancia Aérea',
     entidad: 'Facultad de Informática - Universidad Autónoma de Querétaro',
     fechaGeneracion: new Date().toISOString(),
     resumenSeguridad: {
       cifrado: 'AES-GCM en reposo (grabaciones)',
-      politicaRetencion: '30 días reglamentarios',
+      bitacoraInmutableRegistros: flightLogs?.length ?? 0,
       muestrasTelemetria: telemetry?.length ?? 0,
       grabacionesRegistradas: recordings?.length ?? 0,
     },
-    registrosTelemetriaRecientes: (telemetry || []).map((t) => ({
-      id: t.id,
-      misionId: t.mision_id,
-      timestamp: t.timestamp,
-      latitud: t.latitud,
-      longitud: t.longitud,
-      altitudMetros: t.altitud_metros,
-      bateriaPorcentaje: t.bateria_porcentaje,
-      velocidadTierraMs: t.velocidad_tierra_ms,
-      modoVuelo: t.modo_vuelo,
-      estadoEnlace: t.estado_enlace,
-    })),
-    grabaciones: (recordings || []).map((r) => ({
-      id: r.id,
-      vueloId: r.vuelo_id,
-      fechaGrabacion: r.fecha_grabacion,
-      fechaPurga: r.fecha_purga,
-      duracionSegundos: r.duracion_segundos,
-      tamanoBytes: r.tamano_bytes,
-      checksumSha256: r.checksum_sha256,
-    })),
+    bitacoraVuelosInmutable: flightLogs || [],
+    registrosTelemetriaRecientes: telemetry || [],
+    grabaciones: recordings || [],
   }
 
   const filename = `AeroLuferan_Registro_Auditoria_${new Date().toISOString().slice(0, 10)}.json`

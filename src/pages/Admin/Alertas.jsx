@@ -1,14 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
 import {
   BellIcon,
   CheckIcon,
   CompassIcon,
-  PlaneIcon,
   ShieldIcon,
 } from '../../components/EnVivoIcons.jsx'
 import useAlerts from '../../hooks/useAlerts.js'
+import aeroluferanLogo from '../../assets/aeroluferan-logo.png'
+import {
+  CRITICAL_PUSH_EVENT,
+  getBrowserNotificationPermission,
+  isCriticalPushEnabledForCurrentUser,
+  requestBrowserNotificationPermission,
+  resolveAlertIncident,
+} from '../../services/alertService.js'
 import './Alertas.css'
 
 const filters = [
@@ -19,9 +26,50 @@ const filters = [
 
 function Alertas() {
   const navigate = useNavigate()
-  const { alerts, markAsViewed, dismissAlert, dispatchGuard } = useAlerts('admin')
+  const {
+    alerts,
+    pendingAlertsCount,
+    markAsViewed,
+    markAllAsViewed,
+    dismissAlert,
+    dispatchGuard,
+  } = useAlerts('admin')
   const [activeFilter, setActiveFilter] = useState('all')
   const [lastAction, setLastAction] = useState('')
+  const [resolvingAlert, setResolvingAlert] = useState(null)
+  const [resolutionNote, setResolutionNote] = useState('')
+  const [isSavingResolution, setIsSavingResolution] = useState(false)
+
+  useEffect(() => {
+    const onCriticalPush = (event) => {
+      const detail = event?.detail
+      if (!detail) return
+      setLastAction(`ALERTA EN TIEMPO REAL: ${detail.titulo || 'Nuevo incidente crítico detectado'}`)
+    }
+    window.addEventListener(CRITICAL_PUSH_EVENT, onCriticalPush)
+    return () => window.removeEventListener(CRITICAL_PUSH_EVENT, onCriticalPush)
+  }, [])
+
+  const handleBellClick = async () => {
+    const pushActive = isCriticalPushEnabledForCurrentUser()
+    if (!pushActive) {
+      setLastAction('Las Alertas Push Críticas están silenciadas en Ajustes.')
+      return
+    }
+    const perm = getBrowserNotificationPermission()
+    if (perm === 'default') {
+      const granted = await requestBrowserNotificationPermission()
+      if (granted === 'granted') {
+        setLastAction('Notificaciones push del navegador activadas para alertas críticas.')
+        return
+      }
+    }
+    setLastAction(
+      pendingAlertsCount > 0
+        ? `Notificaciones Push activas · ${pendingAlertsCount} alerta(s) nueva(s) sin visualizar.`
+        : 'Notificaciones Push activas · Bandeja al día.',
+    )
+  }
 
   const filterCounts = useMemo(
     () => ({
@@ -45,12 +93,35 @@ function Alertas() {
 
   const handleDispatchGuard = (alert) => {
     dispatchGuard(alert.id)
-    setLastAction(`Solicitud de despacho registrada para ${alert.droneName}.`)
+    setLastAction(
+      `Guardia despachado en servidor para ${alert.droneName} (Incidente #${alert.eventoId || alert.id} → En atención).`,
+    )
+  }
+
+  const handleOpenResolveModal = (alert) => {
+    setResolvingAlert(alert)
+    setResolutionNote(alert.notasResolucion || '')
+  }
+
+  const handleConfirmResolve = async (e) => {
+    e.preventDefault()
+    if (!resolvingAlert) return
+    setIsSavingResolution(true)
+    try {
+      await resolveAlertIncident(resolvingAlert.id, 'admin', resolutionNote)
+      setLastAction(`Incidente #${resolvingAlert.eventoId || resolvingAlert.id} marcado como RESUELTO y auditado.`)
+      setResolvingAlert(null)
+      setResolutionNote('')
+    } catch (error) {
+      setLastAction(error?.message || 'No se pudo marcar el incidente como resuelto.')
+    } finally {
+      setIsSavingResolution(false)
+    }
   }
 
   const handleDismiss = (alertId) => {
     dismissAlert(alertId)
-    setLastAction('Notificación descartada y retirada de la vista actual.')
+    setLastAction('Notificación descartada en tu bandeja y registrada en servidor.')
   }
 
   return (
@@ -58,9 +129,11 @@ function Alertas() {
       <div className="alertas-shell">
         <header className="alertas-header">
           <div className="alertas-brand">
-            <span className="alertas-brand-mark" aria-hidden="true">
-              <PlaneIcon />
-            </span>
+            <img
+              className="alertas-brand-logo"
+              src={aeroluferanLogo}
+              alt="Emblema AeroLuferan"
+            />
             <div className="alertas-brand-copy">
               <strong>AeroLuferan</strong>
               <span>Bandeja de Incidentes</span>
@@ -69,9 +142,15 @@ function Alertas() {
 
           <div className="alertas-header-actions">
             <span className="alertas-status-pill">
+              <span className="alertas-status-dot" aria-hidden="true" />
               En patrullaje
             </span>
-            <button type="button" className="alertas-notification-button" aria-label="Notificaciones">
+            <button
+              type="button"
+              className="alertas-notification-button"
+              aria-label="Notificaciones"
+              onClick={handleBellClick}
+            >
               <BellIcon />
             </button>
           </div>
@@ -79,6 +158,7 @@ function Alertas() {
 
         <section className="monitor-card" aria-label="Estado de monitoreo perimetral">
           <div className="monitor-card__label">
+            <span className="monitor-card__dot" aria-hidden="true" />
             <div>
               <div className="monitor-card__title">Monitoreo Perimetral Activo</div>
               <div className="monitor-card__details">Latencia en tiempo real &lt; 850ms</div>
@@ -102,6 +182,44 @@ function Alertas() {
           ))}
         </div>
 
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '4px 2px 8px',
+            fontSize: '12px',
+            color: '#475569',
+          }}
+        >
+          <span>
+            {pendingAlertsCount > 0
+              ? `${pendingAlertsCount} sin visualizar`
+              : 'Todas las alertas visualizadas'}
+          </span>
+          {pendingAlertsCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                markAllAsViewed()
+                setLastAction('Todas las alertas marcadas como vistas en el servidor.')
+              }}
+              style={{
+                background: '#e0f2fe',
+                color: '#0369a1',
+                border: 'none',
+                borderRadius: '999px',
+                padding: '4px 10px',
+                fontSize: '11.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Marcar todas vistas
+            </button>
+          )}
+        </div>
+
         <main className="alerts-list" aria-live="polite">
           {visibleAlerts.length > 0 ? (
             visibleAlerts.map((alert) => (
@@ -115,7 +233,9 @@ function Alertas() {
                     <div className="alert-card__meta">
                       <div className="alert-card__title-row">
                         <strong className="alert-card__title">{alert.droneName}</strong>
-                        <span className="alert-card__time">{alert.age}</span>
+                        <span className="alert-card__time">
+                          {alert.age} · {alert.status}
+                        </span>
                       </div>
                       <span className="alert-card__location">
                         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -144,7 +264,10 @@ function Alertas() {
 
                     <div className="alert-card__telemetry">
                       <span className="alert-card__telemetry-left">{alert.coordinates}</span>
-                      <span className="alert-card__telemetry-right">{alert.altitude} · {alert.timestamp}</span>
+                      <span className="alert-card__telemetry-right">
+                        {alert.altitude !== 'N/A' ? `${alert.altitude} · ` : ''}
+                        {alert.timestamp}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -154,9 +277,17 @@ function Alertas() {
                     <span className="alert-card__description-icon" aria-hidden="true">
                       <ShieldIcon />
                     </span>
-                    {alert.severity === 'critical' ? 'Posible inicio de conato de incendio' : 'Persona no autorizada fuera de horario'}
+                    {alert.incidentTitle ||
+                      (alert.severity === 'critical'
+                        ? 'Posible inicio de conato de incendio'
+                        : 'Persona no autorizada fuera de horario')}
                   </strong>
                   <div>{alert.description}</div>
+                  {alert.notasResolucion && (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: '#15803d', fontWeight: 600 }}>
+                      ✓ Nota de atención: {alert.notasResolucion}
+                    </div>
+                  )}
                 </div>
 
                 {alert.audit && (
@@ -185,17 +316,49 @@ function Alertas() {
                     </svg>
                     Ver en Vivo
                   </button>
+
+                  {alert.resolved ? (
+                    <button
+                      type="button"
+                      className="alert-card__action alert-card__action--neutral"
+                      disabled
+                      style={{ opacity: 0.75 }}
+                    >
+                      ✓ Incidente Resuelto
+                    </button>
+                  ) : alert.dispatched ? (
+                    <button
+                      type="button"
+                      className="alert-card__action alert-card__action--primary"
+                      onClick={() => handleOpenResolveModal(alert)}
+                    >
+                      <CheckIcon />
+                      Marcar como Resuelto
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="alert-card__action alert-card__action--primary"
+                      onClick={() => handleDispatchGuard(alert)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 2.5v7.5m0 0L8 10.5m4 0 4-1.5M4.5 12.5a7.5 7.5 0 1 0 15 0 7.5 7.5 0 0 0-15 0Z" />
+                      </svg>
+                      Despachar Guardia
+                    </button>
+                  )}
+                </div>
+
+                {!alert.resolved && !alert.dispatched && (
                   <button
                     type="button"
-                    className="alert-card__action alert-card__action--primary"
-                    onClick={() => handleDispatchGuard(alert)}
+                    className="alert-card__dismiss"
+                    style={{ marginBottom: '4px', color: '#0369a1' }}
+                    onClick={() => handleOpenResolveModal(alert)}
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M12 2.5v7.5m0 0L8 10.5m4 0 4-1.5M4.5 12.5a7.5 7.5 0 1 0 15 0 7.5 7.5 0 0 0-15 0Z" />
-                    </svg>
-                    Despachar Guardia
+                    ✓ Cerrar / Marcar como Resuelto
                   </button>
-                </div>
+                )}
 
                 <button
                   type="button"
@@ -214,6 +377,91 @@ function Alertas() {
         {lastAction && (
           <div className="alert-card__status-message" aria-live="polite">
             {lastAction}
+          </div>
+        )}
+
+        {resolvingAlert && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="resolve-modal-title"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.55)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: '16px',
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setResolvingAlert(null)
+            }}
+          >
+            <form
+              onSubmit={handleConfirmResolve}
+              style={{
+                background: '#ffffff',
+                borderRadius: '16px',
+                padding: '20px',
+                maxWidth: '400px',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <strong id="resolve-modal-title" style={{ fontSize: '16px', color: '#0f172a' }}>
+                Resolver Incidente #{resolvingAlert.eventoId || resolvingAlert.id}
+              </strong>
+              <label style={{ fontSize: '13px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span>Nota de resolución y cierre (auditable):</span>
+                <textarea
+                  rows={3}
+                  value={resolutionNote}
+                  onChange={(e) => setResolutionNote(e.target.value)}
+                  placeholder="Ej. Zona verificada por personal de guardia, falsa alarma / perímetro asegurado."
+                  style={{
+                    width: '100%',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    padding: '8px 10px',
+                    fontSize: '13px',
+                  }}
+                />
+              </label>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => setResolvingAlert(null)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: '1px solid #cbd5e1',
+                    background: '#f8fafc',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingResolution}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: '#15803d',
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isSavingResolution ? 'Guardando…' : 'Confirmar Resolución'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 

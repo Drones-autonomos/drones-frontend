@@ -62,6 +62,15 @@
   gap: 14px;
 }
 
+/* Columna envuelta de grupos (desktop: una por lado del grid 2×2;
+   móvil: apila con el mismo respiro de 14px) */
+.ajustes-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 /* ==========================================================================
    3. TARJETA DE INFORMACIÓN DEL USUARIO (SUPERIOR)
    ========================================================================== */

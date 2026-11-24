@@ -36,6 +36,7 @@ const ESTADO_UI = {
 
 export const CANCELLABLE_ESTADOS = new Set(['PROGRAMADA', 'EN_CURSO'])
 export const STARTABLE_ESTADOS = new Set(['PROGRAMADA'])
+export const RETRYABLE_ESTADOS = new Set(['FALLIDA', 'CANCELADA', 'FINALIZADA'])
 
 function notifyMissionsUpdated(detail = null) {
   try {
@@ -65,7 +66,7 @@ function formatTimeDisplay(mission) {
 
 /** Descripciones generadas por ProgramarRuta siguen el formato "Zona · Tipo · Frecuencia · Origen → Destino · N min". */
 function parseDescriptionMetadata(descripcion) {
-  const meta = { zone: 'Campus FIF', patrolType: '', duration: '' }
+  const meta = { zone: '—', patrolType: '', duration: '' }
   if (!descripcion || typeof descripcion !== 'string') return meta
   const parts = descripcion.split(' · ').map((p) => p.trim()).filter(Boolean)
   if (parts.length === 0) return meta
@@ -293,6 +294,18 @@ export async function startPresetMission(presetKey) {
   return mapBackendMission(updated)
 }
 
+/**
+ * Reintenta una misión terminada (FALLIDA, CANCELADA o FINALIZADA): el
+ * backend clona la ruta en una nueva PROGRAMADA y la inicia de inmediato.
+ * Si el dron no está listo, el clon queda PROGRAMADA para iniciarlo luego.
+ * Habilitado para ADMIN y GUARDIA.
+ */
+export async function retryMission(id) {
+  const updated = await apiClient.post(`/missions/${id}/retry`)
+  notifyMissionsUpdated({ type: 'started', mission: updated })
+  return mapBackendMission(updated)
+}
+
 /** Cancela una misión (ADMIN y GUARDIA). EN_CURSO pasa a CANCELANDO con RTL. */
 export async function cancelMission(id) {
   const updated = await apiClient.post(`/missions/${id}/cancel`)
@@ -350,6 +363,7 @@ const missionService = {
   setSchedulerEnabled,
   startMission,
   startPresetMission,
+  retryMission,
   cancelMission,
   confirmMissionLanded,
   getActiveMission,

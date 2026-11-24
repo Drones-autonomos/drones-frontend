@@ -3,36 +3,51 @@ import campusReference from '../assets/campus-reference.svg'
 import { captureSnapshotFrame } from '../services/videoService.js'
 import {
   CameraIcon,
-  CheckIcon,
   CompassIcon,
   CompressIcon,
   ExpandIcon,
   ShieldIcon,
 } from './EnVivoIcons.jsx'
 
+const MIN_ZOOM = 1
+const MAX_ZOOM = 5
+
+// Overlay de telemetría sin datos: valores neutros hasta que el emisor
+// (telemetryService) alimente la vista — nunca mediciones inventadas.
+const EMPTY_PREVIEW = {
+  status: '—',
+  resolution: '—',
+  encryption: '—',
+  observedArea: '—',
+  areaStatus: '—',
+  heading: '—',
+  tilt: '—',
+}
+
 export function DroneVideoPlayer({
   stream = null,
   streamUrl = null,
   isLive = false,
   connectionState = 'idle',
-  preview = {
-    status: 'EN VIVO',
-    resolution: '1080p 60fps',
-    encryption: 'AES-256',
-    observedArea: 'Coliseo',
-    areaStatus: 'Despejado',
-    heading: 'HDG 142° SE',
-    tilt: 'Tilt -35°',
-  },
+  vueloId = null,
+  preview = EMPTY_PREVIEW,
   posterImage = campusReference,
 }) {
   const containerRef = useRef(null)
   const videoRef = useRef(null)
+  const mediaRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [playerMessage, setPlayerMessage] = useState('')
   const [isCapturing, setIsCapturing] = useState(false)
 
-  // Conectar el MediaStream de WebRTC al elemento HTML5 video cuando esté disponible
+  // Estado de zoom/paneo de la vista (mapa de referencia o video en vivo).
+  // Se mantiene en refs + estilo directo para no re-renderizar en cada frame.
+  const zoomRef = useRef({ scale: 1, x: 0, y: 0 })
+  const pointersRef = useRef(new Map())
+  const pinchRef = useRef(null)
+  const panRef = useRef(null)
+  const [isZoomed, setIsZoomed] = useState(false)
+
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream
@@ -42,7 +57,6 @@ export function DroneVideoPlayer({
     }
   }, [stream])
 
-  // Escuchar cambios de estado de pantalla completa (incluyendo tecla Escape)
   useEffect(() => {
     function handleFullscreenChange() {
       const activeElement = document.fullscreenElement
@@ -54,6 +68,140 @@ export function DroneVideoPlayer({
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
   }, [])
+
+  // --- Zoom / paneo de la vista previa (rueda, pinzada táctil, doble clic) ---
+  function clampScale(scale) {
+    return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale))
+  }
+
+  function clampPan(scale, x, y) {
+    const container = containerRef.current
+    if (!container) return { x: 0, y: 0 }
+    const { width, height } = container.getBoundingClientRect()
+    // transform-origin 0 0: x ∈ [width*(1-scale), 0], y ∈ [height*(1-scale), 0]
+    return {
+      x: Math.min(0, Math.max(width * (1 - scale), x)),
+      y: Math.min(0, Math.max(height * (1 - scale), y)),
+    }
+  }
+
+  function applyZoom() {
+    const el = mediaRef.current
+    if (!el) return
+    const { scale, x, y } = zoomRef.current
+    el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`
+    setIsZoomed(scale > MIN_ZOOM + 0.01)
+  }
+
+  // Zoom manteniendo fijo el punto `point` (coords relativas al contenedor)
+  function zoomToPoint(nextScale, point) {
+    const z = zoomRef.current
+    const scale = clampScale(nextScale)
+    const ratio = scale / z.scale
+    const x = point.x - (point.x - z.x) * ratio
+    const y = point.y - (point.y - z.y) * ratio
+    const clamped = clampPan(scale, x, y)
+    zoomRef.current = { scale, x: clamped.x, y: clamped.y }
+    applyZoom()
+  }
+
+  function resetZoom() {
+    zoomRef.current = { scale: 1, x: 0, y: 0 }
+    panRef.current = null
+    pinchRef.current = null
+    pointersRef.current.clear()
+    applyZoom()
+  }
+
+  function containerPoint(event) {
+    const rect = containerRef.current.getBoundingClientRect()
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top }
+  }
+
+  // Rueda del ratón: listener nativo no-pasivo para poder preventDefault
+  useEffect(() => {
+    const el = mediaRef.current
+    if (!el) return
+    function onWheel(event) {
+      event.preventDefault()
+      const factor = event.deltaY < 0 ? 1.25 : 0.8
+      zoomToPoint(zoomRef.current.scale * factor, containerPoint(event))
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, streamUrl])
+
+  function handlePointerDown(event) {
+    if (!mediaRef.current) return
+    mediaRef.current.setPointerCapture?.(event.pointerId)
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    if (pointersRef.current.size === 1) {
+      panRef.current = { x: event.clientX, y: event.clientY }
+    } else if (pointersRef.current.size === 2) {
+      const [a, b] = [...pointersRef.current.values()]
+      pinchRef.current = {
+        distance: Math.hypot(a.x - b.x, a.y - b.y),
+        scale: zoomRef.current.scale,
+      }
+      panRef.current = null
+    }
+  }
+
+  function handlePointerMove(event) {
+    if (!pointersRef.current.has(event.pointerId)) return
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    if (pointersRef.current.size === 2 && pinchRef.current) {
+      const [a, b] = [...pointersRef.current.values()]
+      const distance = Math.hypot(a.x - b.x, a.y - b.y)
+      const midpoint = containerPoint({
+        clientX: (a.x + b.x) / 2,
+        clientY: (a.y + b.y) / 2,
+      })
+      zoomToPoint(
+        pinchRef.current.scale * (distance / pinchRef.current.distance),
+        midpoint,
+      )
+      return
+    }
+
+    if (panRef.current && zoomRef.current.scale > MIN_ZOOM) {
+      const z = zoomRef.current
+      const clamped = clampPan(
+        z.scale,
+        z.x + (event.clientX - panRef.current.x),
+        z.y + (event.clientY - panRef.current.y),
+      )
+      zoomRef.current = { ...z, x: clamped.x, y: clamped.y }
+      panRef.current = { x: event.clientX, y: event.clientY }
+      applyZoom()
+    }
+  }
+
+  function handlePointerEnd(event) {
+    pointersRef.current.delete(event.pointerId)
+    if (pointersRef.current.size < 2) pinchRef.current = null
+    if (pointersRef.current.size === 0) panRef.current = null
+    else {
+      const [remaining] = [...pointersRef.current.values()]
+      panRef.current = { x: remaining.x, y: remaining.y }
+    }
+  }
+
+  function handleDoubleClick(event) {
+    if (zoomRef.current.scale > MIN_ZOOM + 0.01) {
+      resetZoom()
+    } else {
+      zoomToPoint(2.5, containerPoint(event))
+    }
+  }
+
+  // Reset del zoom cuando cambia la fuente (poster ↔ stream en vivo)
+  useEffect(() => {
+    resetZoom()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, streamUrl, stream])
 
   async function toggleFullscreen() {
     try {
@@ -76,7 +224,14 @@ export function DroneVideoPlayer({
     try {
       setIsCapturing(true)
       setPlayerMessage('')
-      await captureSnapshotFrame()
+      const meta = await captureSnapshotFrame({ vueloId })
+      if (meta?.checksum_sha256) {
+        setPlayerMessage(
+          `Evidencia sellada en servidor · SHA-256 #${meta.checksum_sha256.slice(0, 8).toUpperCase()}`,
+        )
+      } else {
+        setPlayerMessage('Captura descargada localmente.')
+      }
     } catch (err) {
       setPlayerMessage(
         err instanceof Error ? err.message : 'No se pudo capturar la evidencia del video.',
@@ -92,37 +247,50 @@ export function DroneVideoPlayer({
         className={`live-preview${isFullscreen ? ' is-fullscreen' : ''}`}
         ref={containerRef}
       >
-        {isLive && streamUrl ? (
-          <img
-            className="live-preview__video"
-            src={streamUrl}
-            alt="Transmisión en tiempo real del dron (MJPEG)"
-          />
-        ) : isLive && stream ? (
-          <video
-            ref={videoRef}
-            className="live-preview__video"
-            autoPlay
-            playsInline
-            muted
-            aria-label="Transmisión en tiempo real del dron mediante WebRTC"
-          />
-        ) : (
-          <img
-            className="live-preview__image"
-            src={posterImage}
-            alt="Vista de referencia provisional del campus mientras se establece la conexión WebRTC"
-          />
-        )}
+        <div
+          ref={mediaRef}
+          className={`live-preview__media${isZoomed ? ' is-zoomed' : ''}`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
+          onDoubleClick={handleDoubleClick}
+        >
+          {isLive && streamUrl ? (
+            <img
+              className="live-preview__video"
+              src={streamUrl}
+              alt="Transmisión en tiempo real del dron (MJPEG)"
+              draggable={false}
+            />
+          ) : isLive && stream ? (
+            <video
+              ref={videoRef}
+              className="live-preview__video"
+              autoPlay
+              playsInline
+              muted
+              aria-label="Transmisión en tiempo real del dron mediante WebRTC"
+            />
+          ) : (
+            <img
+              className="live-preview__image"
+              src={posterImage}
+              alt="Vista de referencia provisional del campus mientras se establece la conexión"
+              draggable={false}
+            />
+          )}
+        </div>
 
-        {/* Encabezado superior del overlay de video */}
         <div className="preview-topline">
           {isLive ? (
             <span className="preview-live-indicator">
+              <span className="preview-live-dot" />
               EN VIVO
             </span>
           ) : (
             <span className="preview-live-indicator preview-live-indicator--pending">
+              <span className="preview-live-dot preview-live-dot--pending" />
               {connectionState === 'connecting'
                 ? 'CONECTANDO...'
                 : connectionState === 'disconnected'
@@ -138,27 +306,24 @@ export function DroneVideoPlayer({
           </span>
         </div>
 
-        {/* Aviso de vista de referencia cuando no hay transmisión activa */}
         {!isLive && (
           <span className="preview-demo-note" role="status">
             VISTA DE REFERENCIA · STREAM DE VIDEO NO DISPONIBLE
           </span>
         )}
 
-        {/* Retícula central de detección / enfoque visual */}
         <div className="preview-crosshair" aria-hidden="true">
           <span />
         </div>
 
-        {/* Estado de la zona observada */}
         <div className="preview-area-status">
+          <span className="preview-area-dot" />
           <span>
-            <strong><CheckIcon /> {preview.observedArea}</strong>
+            <strong>{preview.observedArea === '—' ? '—' : `✓ ${preview.observedArea}`}</strong>
             <span>{preview.areaStatus}</span>
           </span>
         </div>
 
-        {/* Indicadores de telemetría de cámara HUD (HDG y Tilt) */}
         <div className="preview-readings">
           <span className="preview-reading">
             <CompassIcon />
@@ -167,13 +332,24 @@ export function DroneVideoPlayer({
           <span className="preview-reading">{preview.tilt}</span>
         </div>
 
-        {/* Botón de captura de evidencia (solo con señal MJPEG activa) */}
+        {isZoomed && (
+          <button
+            className="preview-zoom-reset"
+            type="button"
+            aria-label="Restablecer zoom de la vista"
+            title="Restablecer zoom (1×)"
+            onClick={resetZoom}
+          >
+            1×
+          </button>
+        )}
+
         {isLive && streamUrl && (
           <button
             className="preview-capture"
             type="button"
-            aria-label="Capturar evidencia del frame actual"
-            title="Capturar evidencia"
+            aria-label="Capturar y sellar evidencia del frame actual"
+            title="Capturar evidencia sellada (SHA-256)"
             disabled={isCapturing}
             onClick={handleCaptureSnapshot}
           >
@@ -181,7 +357,6 @@ export function DroneVideoPlayer({
           </button>
         )}
 
-        {/* Botón de pantalla completa / regresar a vista normal */}
         <button
           className="preview-fullscreen"
           type="button"

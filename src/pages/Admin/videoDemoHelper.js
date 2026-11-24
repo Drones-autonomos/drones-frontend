@@ -16,6 +16,10 @@ import {
  * backend no tiene video para ese vuelo.
  */
 export async function getOrCreateFlightVideoUrl(flight) {
+  if (flight?.video?.isPurged) {
+    return null
+  }
+
   // Grabación real almacenada en el backend (cifrada en reposo, descifrada al servirla)
   if (flight?.video?.recordingId) {
     try {
@@ -38,8 +42,8 @@ export async function getOrCreateFlightVideoUrl(flight) {
  * Descarga el archivo de video de la grabación seleccionada
  */
 export async function downloadFlightRecording(flight, retentionStatus) {
-  // Grabación real en el backend: descarga autenticada (solo ADMIN según la API)
-  if (flight?.video?.recordingId) {
+  // Grabación real o purgada en el backend: descarga autenticada (solo ADMIN según la API)
+  if (flight?.video?.isPurged || flight?.video?.recordingId) {
     return await downloadRecordingFile(flight)
   }
 

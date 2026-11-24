@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
-import { AeroHelmetLogo, CloseModalIcon, DownloadTrayIcon } from '../../components/BitacoraIcons.jsx'
+import { CloseModalIcon, DownloadTrayIcon } from '../../components/BitacoraIcons.jsx'
+import aeroluferanLogo from '../../assets/aeroluferan-logo.png'
 import {
   AuditDownloadIcon,
   BackArrowIcon,
@@ -18,7 +19,7 @@ import {
   UserVerifiedBadgeIcon,
   VideoLockIcon,
 } from '../../components/AjustesIcons.jsx'
-import { getCurrentUser, logoutUser, updateUserProfile } from './authSession.js'
+import { changePassword, getCurrentUser, logoutUser, updateUserProfile } from './authSession.js'
 import {
   AI_SENSITIVITY_OPTIONS,
   getStoredSettings,
@@ -27,12 +28,15 @@ import {
   syncSettingsFromBackend,
   TRANSMISSION_QUALITY_OPTIONS,
 } from './ajustesData.js'
-import { generateAuditExportFile } from '../../services/flightLogService.js'
+import { downloadAuditExport, fetchAuditLogs } from '../../services/auditService.js'
+import { describeApiError } from '../../services/apiClient.js'
 import { droneControlService } from '../../services/droneControlService.js'
 import {
   fetchOperatingWindow,
   updateOperatingWindow,
 } from '../../services/settingsService.js'
+import useChargingStations from '../../hooks/useChargingStations.js'
+import StatusPlaceholder from '../../components/StatusPlaceholder.jsx'
 import './Ajustes.css'
 
 // Etiquetas UI para el estado de la base de carga (backend: IDLE|DOCKED|CHARGING|CHARGED)
@@ -42,6 +46,9 @@ const CHARGING_BASE_ESTADO_LABEL = {
   CHARGING: 'Carga por inducción activa',
   CHARGED: 'Carga completa',
 }
+
+// Tamaño máximo de fotografía de perfil (2 MB, igual que el límite del backend)
+const MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024
 
 /**
  * Pantalla principal del Módulo Ajustes y Edición de Perfil de AeroLuferan
@@ -87,7 +94,34 @@ export default function Ajustes({ initialView = 'main' }) {
   const [isQualityModalOpen, setIsQualityModalOpen] = useState(false)
   const [isHeliportModalOpen, setIsHeliportModalOpen] = useState(false)
   const [isNormativeModalOpen, setIsNormativeModalOpen] = useState(false)
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
+
+  // 3b. Formulario controlado de edición de perfil (inicializado una vez por vista;
+  // patrón "ajustar estado durante el render" al entrar a la vista de perfil)
+  const [profileDraft, setProfileDraft] = useState({ name: '', position: '' })
+  const [prevView, setPrevView] = useState(view)
+  if (prevView !== view) {
+    setPrevView(view)
+    if (view === 'editProfile') {
+      setProfileDraft({
+        name: currentUser.name || '',
+        position: currentUser.position || currentUser.customPosition || '',
+      })
+    }
+  }
+
+  // 3c. Cambio de contraseña propio (POST /auth/change-password)
+  const [pwdForm, setPwdForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwdSaving, setPwdSaving] = useState(false)
+  const [pwdError, setPwdError] = useState(null)
+
+  // 3d. Visor de bitácora de auditoría (GET /audit/, solo ADMIN)
+  const [auditLogs, setAuditLogs] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState(null)
+  const [auditActionFilter, setAuditActionFilter] = useState('')
 
   // 4. Ventana operativa normativa del backend (GET /settings/operating-window)
   const [operatingWindow, setOperatingWindow] = useState(null)
@@ -106,45 +140,28 @@ export default function Ajustes({ initialView = 'main' }) {
     }
   }, [])
 
-  // 5. Estación de carga real (GET /drone/charging-base, best-effort)
-  const [chargingBase, setChargingBase] = useState(null)
-  const [isDocking, setIsDocking] = useState(false)
+  // 5. Estaciones de carga reales (GET /drone/charging-bases, ambas bases)
+  const {
+    stations: chargingBases,
+    error: chargingBasesError,
+    reload: refreshChargingBases,
+  } = useChargingStations()
+  const [dockingStationId, setDockingStationId] = useState(null)
 
-  useEffect(() => {
-    let isMounted = true
-    async function loadChargingBase() {
-      try {
-        const status = await droneControlService.getChargingBaseStatus()
-        if (isMounted) setChargingBase(status)
-      } catch {
-        if (isMounted) setChargingBase(null)
-      }
-    }
-    loadChargingBase()
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  const primaryChargingBase = chargingBases[0] || null
 
-  async function refreshChargingBase() {
+  // Ciclo de acoplamiento + recarga por estación (solo ADMIN:
+  // POST /drone/charging-base/dock-recharge?station_id=...&target_pct=100)
+  async function handleDockAndRecharge(stationId) {
     try {
-      setChargingBase(await droneControlService.getChargingBaseStatus())
-    } catch {
-      setChargingBase(null)
-    }
-  }
-
-  // Ciclo de acoplamiento + recarga (solo ADMIN: POST /drone/charging-base/dock-recharge)
-  async function handleDockAndRecharge() {
-    try {
-      setIsDocking(true)
-      const result = await droneControlService.dockAndRecharge(100)
+      setDockingStationId(stationId)
+      const result = await droneControlService.dockAndRecharge(100, stationId)
       showToast(result?.message || `Recarga completada al ${Math.round(result?.bateria_porcentaje ?? 100)}%`)
-      await refreshChargingBase()
+      await refreshChargingBases()
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'No se pudo ejecutar el ciclo de recarga.')
+      showToast(describeApiError(error, 'No se pudo ejecutar el ciclo de recarga.'))
     } finally {
-      setIsDocking(false)
+      setDockingStationId(null)
     }
   }
 
@@ -174,26 +191,31 @@ export default function Ajustes({ initialView = 'main' }) {
     )
   }, [settings.transmissionQualityId])
 
-  // Manejo del interruptor de Alertas Push Críticas
+  // Manejo del interruptor de Alertas Push Críticas (saveSettings devuelve
+  // promesa real: se muestra error honesto si el backend responde 4xx/5xx)
   function handleTogglePush() {
     const nextState = !settings.criticalPushEnabled
     const updated = { ...settings, criticalPushEnabled: nextState }
     setSettings(updated)
     saveSettings(updated)
-    showToast(
-      nextState
-        ? 'Alertas push críticas activadas para detección de incidentes.'
-        : 'Alertas push críticas desactivadas en este dispositivo.',
-    )
+      .then(() =>
+        showToast(
+          nextState
+            ? 'Alertas push críticas activadas para detección de incidentes.'
+            : 'Alertas push críticas desactivadas en este dispositivo.',
+        ),
+      )
+      .catch(() => showToast('El servidor rechazó el cambio de alertas push.'))
   }
 
   // Manejo de selección de sensibilidad de detección IA
   function handleSelectAiSensitivity(optionId) {
     const updated = { ...settings, aiSensitivityId: optionId }
     setSettings(updated)
-    saveSettings(updated)
     const opt = AI_SENSITIVITY_OPTIONS.find((o) => o.id === optionId)
-    showToast(`Sensibilidad IA establecida en ${opt?.badgeText || optionId}.`)
+    saveSettings(updated)
+      .then(() => showToast(`Sensibilidad IA establecida en ${opt?.badgeText || optionId}.`))
+      .catch(() => showToast('El servidor rechazó el cambio de sensibilidad IA.'))
   }
 
   // Manejo de cambio de ciclo de vida de grabaciones
@@ -201,29 +223,99 @@ export default function Ajustes({ initialView = 'main' }) {
     const updated = { ...settings, retentionDays: days }
     setSettings(updated)
     saveSettings(updated)
-    setIsRetentionModalOpen(false)
-    showToast(`Periodo de retención configurado a ${days} días reglamentarios.`)
+      .then(() => {
+        setIsRetentionModalOpen(false)
+        showToast(`Periodo de retención configurado a ${days} días reglamentarios.`)
+      })
+      .catch(() => showToast('El servidor rechazó el cambio de retención.'))
   }
 
   // Manejo de cambio de calidad de video
   function handleSelectQuality(qualityId) {
     const updated = { ...settings, transmissionQualityId: qualityId }
     setSettings(updated)
-    saveSettings(updated)
-    setIsQualityModalOpen(false)
     const opt = TRANSMISSION_QUALITY_OPTIONS.find((q) => q.id === qualityId)
-    showToast(`Calidad de transmisión actualizada a ${opt?.label.split(' (')[0] || qualityId}.`)
+    saveSettings(updated)
+      .then(() => {
+        setIsQualityModalOpen(false)
+        showToast(`Calidad de transmisión actualizada a ${opt?.label.split(' (')[0] || qualityId}.`)
+      })
+      .catch(() => showToast('El servidor rechazó el cambio de calidad.'))
   }
 
-  // Descarga del registro criptográfico de auditoría (datos reales del backend)
+  // Descarga del registro criptográfico de auditoría real (GET /audit/export)
   async function handleDownloadAudit() {
     try {
-      const { filename } = await generateAuditExportFile()
+      const { filename } = await downloadAuditExport()
       showToast(`Descargando ${filename}`)
     } catch {
       showToast('No se pudo generar el registro de auditoría desde el servidor.')
     }
   }
+
+  // Cambio de contraseña propio (POST /auth/change-password, revoca sesión)
+  function openPasswordModal() {
+    setPwdForm({ current: '', next: '', confirm: '' })
+    setPwdError(null)
+    setIsPasswordModalOpen(true)
+  }
+
+  async function handleSubmitPasswordChange(event) {
+    event.preventDefault()
+    if (pwdSaving) return
+    if (pwdForm.next.length < 8) {
+      setPwdError('La nueva contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+    if (pwdForm.next !== pwdForm.confirm) {
+      setPwdError('La confirmación no coincide con la nueva contraseña.')
+      return
+    }
+    try {
+      setPwdSaving(true)
+      setPwdError(null)
+      await changePassword(pwdForm.current, pwdForm.next)
+      setIsPasswordModalOpen(false)
+      // El backend revocó el token: se cierra sesión para reingresar.
+      showToast('Contraseña actualizada. Inicia sesión de nuevo.')
+      logoutUser()
+      navigate('/', { replace: true })
+    } catch (error) {
+      setPwdError(
+        error?.status === 400 || error?.status === 422
+          ? 'La nueva contraseña no cumple los requisitos del servidor.'
+          : error?.status === 401
+            ? 'La contraseña actual es incorrecta.'
+            : 'No se pudo cambiar la contraseña. Intenta de nuevo.',
+      )
+    } finally {
+      setPwdSaving(false)
+    }
+  }
+
+  // Visor de bitácora de auditoría (GET /audit/, solo ADMIN). El filtro por
+  // acción se aplica del lado del cliente sobre los últimos 50 eventos.
+  async function openAuditModal() {
+    setIsAuditModalOpen(true)
+    setAuditActionFilter('')
+    setAuditLoading(true)
+    setAuditError(null)
+    try {
+      const rows = await fetchAuditLogs({ limit: 50 })
+      setAuditLogs(Array.isArray(rows) ? rows : [])
+    } catch (error) {
+      setAuditLogs([])
+      setAuditError(error instanceof Error ? error.message : 'No se pudo cargar la bitácora.')
+    } finally {
+      setAuditLoading(false)
+    }
+  }
+
+  const filteredAuditLogs = auditActionFilter
+    ? auditLogs.filter((row) =>
+        String(row.accion || '').toUpperCase().includes(auditActionFilter.toUpperCase()),
+      )
+    : auditLogs
 
   // Ventana operativa: abrir modal de edición y guardar cambios (solo ADMIN)
   function handleOpenOperatingWindow() {
@@ -272,33 +364,53 @@ export default function Ajustes({ initialView = 'main' }) {
     navigate('/admin/ajustes')
   }
 
-  // Manejo de edición de Nombre
+  // Manejo de edición de Nombre (input controlado por profileDraft; el
+  // servidor se sincroniza con debounce y reporta errores reales)
   function handleNameChange(e) {
     const newName = e.target.value
-    const updated = updateUserProfile({ name: newName })
-    setCurrentUser(updated)
+    setProfileDraft((prev) => ({ ...prev, name: newName }))
+    updateUserProfile({ name: newName })
+      .then(setCurrentUser)
+      .catch(() => showToast('No se pudo guardar el nombre en el servidor.'))
   }
 
   // Manejo de edición de Puesto / Administrador
   function handlePositionChange(e) {
     const newPosition = e.target.value
-    const updated = updateUserProfile({ position: newPosition })
-    setCurrentUser(updated)
+    setProfileDraft((prev) => ({ ...prev, position: newPosition }))
+    updateUserProfile({ position: newPosition })
+      .then(setCurrentUser)
+      .catch(() => showToast('No se pudo guardar el puesto en el servidor.'))
   }
 
-  // Manejo de carga de fotografía de perfil
+  // Manejo de carga de fotografía de perfil (máx. 2 MB antes de codificar)
   function handlePhotoUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (file.size > MAX_PROFILE_PHOTO_BYTES) {
+      showToast('La fotografía excede el límite de 2 MB.')
+      e.target.value = ''
+      return
+    }
+    if (file.type && !file.type.startsWith('image/')) {
+      showToast('El archivo seleccionado no es una imagen válida.')
+      e.target.value = ''
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = () => {
       const photoUrl = reader.result
-      const updated = updateUserProfile({ photoUrl })
-      setCurrentUser(updated)
-      showToast('Fotografía de perfil actualizada.')
+      updateUserProfile({ photoUrl })
+        .then((updated) => {
+          setCurrentUser(updated)
+          showToast('Fotografía de perfil actualizada.')
+        })
+        .catch(() => showToast('El servidor rechazó la fotografía de perfil.'))
     }
     reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   // Iniciales del usuario para el avatar
@@ -316,7 +428,11 @@ export default function Ajustes({ initialView = 'main' }) {
         {/* ============================================================== */}
         <header className="ajustes-header">
           <div className="ajustes-brand">
-            <AeroHelmetLogo size={38} />
+            <img
+              src={aeroluferanLogo}
+              alt="Emblema AeroLuferan"
+              style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0 }}
+            />
             <h1 className="ajustes-brand-title">AeroLuferan</h1>
           </div>
         </header>
@@ -379,7 +495,7 @@ export default function Ajustes({ initialView = 'main' }) {
                     id="input-nombre-perfil"
                     type="text"
                     className="edit-profile-input"
-                    value={currentUser.name || ''}
+                    value={profileDraft.name}
                     onChange={handleNameChange}
                     placeholder="Ingresa tu nombre"
                   />
@@ -394,7 +510,7 @@ export default function Ajustes({ initialView = 'main' }) {
                     id="input-puesto-perfil"
                     type="text"
                     className="edit-profile-input"
-                    value={currentUser.position || ''}
+                    value={profileDraft.position}
                     onChange={handlePositionChange}
                     placeholder="Ingresa tu cargo o puesto"
                   />
@@ -404,15 +520,17 @@ export default function Ajustes({ initialView = 'main' }) {
                 <div className="edit-profile-field">
                   <span className="edit-profile-label">Correo</span>
                   <div className="edit-profile-readonly">
-                    {currentUser.email || 'lubazadmin@admin.uaq.mx'}
+                    {currentUser.email || '—'}
                   </div>
                 </div>
 
                 {/* Franja de estado de credencial y RBAC */}
                 <div className="edit-profile-badge-row">
-                  <span className="profile-credential-status">
-                    <span>{currentUser.credentialStatus || 'Credencial Activa'}</span>
-                  </span>
+                  {currentUser.credentialStatus && (
+                    <span className="profile-credential-status">
+                      <span>{currentUser.credentialStatus}</span>
+                    </span>
+                  )}
 
                   <span className="profile-rbac-badge">
                     {currentUser.rbacBadge ||
@@ -448,12 +566,12 @@ export default function Ajustes({ initialView = 'main' }) {
                 </div>
 
                 <div className="profile-card__info">
-                  <h2 className="profile-card__name">{currentUser.name || 'Lu Bazaldúa'}</h2>
+                  <h2 className="profile-card__name">{currentUser.name || '—'}</h2>
                   <span className="profile-card__role">
-                    {currentUser.position || 'Coordinador de Software'}
+                    {currentUser.position || '—'}
                   </span>
                   <span className="profile-card__email">
-                    {currentUser.email || 'lubazadmin@admin.uaq.mx'}
+                    {currentUser.email || '—'}
                   </span>
                 </div>
 
@@ -480,6 +598,8 @@ export default function Ajustes({ initialView = 'main' }) {
               </div>
             </section>
 
+            {/* Columna izquierda: seguridad + estación de carga */}
+            <div className="ajustes-col">
             {/* B. SEGURIDAD & CONTROL OPERATIVO */}
             <div className="ajustes-group">
               <h2 className="ajustes-section-title">SEGURIDAD & CONTROL OPERATIVO</h2>
@@ -503,6 +623,34 @@ export default function Ajustes({ initialView = 'main' }) {
                     <strong className="ajustes-item__title-line">Gestión de Usuarios</strong>
                     <p className="ajustes-item__subtitle">
                       Registrar nuevas cuentas de Administrador o Guardia
+                    </p>
+                  </div>
+                </div>
+
+                <span className="btn-action-circle" aria-hidden="true">
+                  <ChevronRightIcon size={16} />
+                </span>
+              </div>
+
+              {/* Cambio de contraseña propio (POST /auth/change-password) */}
+              <div
+                className="ajustes-item-row"
+                style={{ cursor: 'pointer' }}
+                onClick={openPasswordModal}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') openPasswordModal()
+                }}
+              >
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--green" aria-hidden="true">
+                    <VideoLockIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Cambiar Contraseña</strong>
+                    <p className="ajustes-item__subtitle">
+                      Actualizar credencial de acceso (cierra la sesión actual)
                     </p>
                   </div>
                 </div>
@@ -579,6 +727,48 @@ export default function Ajustes({ initialView = 'main' }) {
             </section>
             </div>
 
+            {/* D. DISPOSITIVO & ESTACIÓN DE CARGA */}
+            <div className="ajustes-group">
+              <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
+            <section className="ajustes-group-card" aria-label="Dispositivos y estaciones de carga">
+              <div
+                className="ajustes-item-row"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setIsHeliportModalOpen(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setIsHeliportModalOpen(true)
+                }}
+              >
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--green" aria-hidden="true">
+                    <HeliportStationIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">
+                      {primaryChargingBase?.nombre || 'Estaciones de carga'}
+                    </strong>
+                    <p className="ajustes-item__subtitle">
+                      {primaryChargingBase
+                        ? `• ${chargingBases.length} estación${chargingBases.length !== 1 ? 'es' : ''} · ${CHARGING_BASE_ESTADO_LABEL[primaryChargingBase.estado] || primaryChargingBase.estado}`
+                        : '• Sin conexión con el backend'}
+                    </p>
+                  </div>
+                </div>
+
+                <span className="heliport-percentage">
+                  {primaryChargingBase ? `${Math.round(primaryChargingBase.bateria_porcentaje)}%` : '—'}
+                </span>
+              </div>
+            </section>
+            </div>
+
+            </div>
+
+            {/* Columna derecha: privacidad + auditoría (evita el hueco
+                que deja la tarjeta corta de privacidad en escritorio) */}
+            <div className="ajustes-col">
             {/* C. ALMACENAMIENTO & PRIVACIDAD */}
             <div className="ajustes-group">
               <h2 className="ajustes-section-title">ALMACENAMIENTO & PRIVACIDAD</h2>
@@ -662,43 +852,6 @@ export default function Ajustes({ initialView = 'main' }) {
             </section>
             </div>
 
-            {/* D. DISPOSITIVO & ESTACIÓN DE CARGA */}
-            <div className="ajustes-group">
-              <h2 className="ajustes-section-title">DISPOSITIVO & ESTACIÓN DE CARGA</h2>
-            <section className="ajustes-group-card" aria-label="Dispositivos y estaciones de carga">
-              <div
-                className="ajustes-item-row"
-                style={{ cursor: 'pointer' }}
-                onClick={() => setIsHeliportModalOpen(true)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') setIsHeliportModalOpen(true)
-                }}
-              >
-                <div className="ajustes-item__left">
-                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--green" aria-hidden="true">
-                    <HeliportStationIcon size={22} />
-                  </div>
-                  <div className="ajustes-item__texts">
-                    <strong className="ajustes-item__title-line">
-                      {settings.helipads[0]?.name || 'Helipuerto Base Norte #01'}
-                    </strong>
-                    <p className="ajustes-item__subtitle">
-                      {chargingBase
-                        ? `• Conectada • ${CHARGING_BASE_ESTADO_LABEL[chargingBase.estado] || chargingBase.estado}`
-                        : '• Sin conexión con el backend'}
-                    </p>
-                  </div>
-                </div>
-
-                <span className="heliport-percentage">
-                  {chargingBase ? `${Math.round(chargingBase.bateria_porcentaje)}%` : '—'}
-                </span>
-              </div>
-            </section>
-            </div>
-
             {/* E. AUDITORÍA & NORMATIVA */}
             <div className="ajustes-group">
               <h2 className="ajustes-section-title">AUDITORÍA & NORMATIVA</h2>
@@ -726,6 +879,34 @@ export default function Ajustes({ initialView = 'main' }) {
                 >
                   <DownloadTrayIcon size={18} color="#00649c" />
                 </button>
+              </div>
+
+              {/* Visor de Bitácora de Auditoría (GET /audit/, solo ADMIN) */}
+              <div
+                className="ajustes-item-row"
+                style={{ cursor: 'pointer' }}
+                onClick={openAuditModal}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') openAuditModal()
+                }}
+              >
+                <div className="ajustes-item__left">
+                  <div className="ajustes-item__icon-wrap ajustes-item__icon-wrap--purple" aria-hidden="true">
+                    <AuditDownloadIcon size={22} />
+                  </div>
+                  <div className="ajustes-item__texts">
+                    <strong className="ajustes-item__title-line">Ver Bitácora de Auditoría</strong>
+                    <p className="ajustes-item__subtitle">
+                      Últimos eventos registrados con sello SHA-256
+                    </p>
+                  </div>
+                </div>
+
+                <span className="btn-action-circle" aria-hidden="true">
+                  <ChevronRightIcon size={16} />
+                </span>
               </div>
 
               {/* Privacidad Estudiantil & Espacio Aéreo */}
@@ -782,6 +963,7 @@ export default function Ajustes({ initialView = 'main' }) {
             </section>
             </div>
 
+            </div>
             {/* F. BOTÓN CERRAR SESIÓN Y VERSIÓN */}
             <button
               type="button"
@@ -999,71 +1181,94 @@ export default function Ajustes({ initialView = 'main' }) {
               </button>
             </div>
             <div className="ajustes-modal-body">
-              {chargingBase ? (
-                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Estación principal:</span>
-                    <strong>{settings.helipads[0]?.name}</strong>
+              {chargingBases.length > 0 ? (
+                chargingBases.map((station) => (
+                  <div
+                    key={station.station_id || station.codigo || station.nombre}
+                    style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', marginBottom: '10px' }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Estación:</span>
+                      <strong>{station.nombre || station.station_id}</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Estado de la base:</span>
+                      <strong style={{ color: '#10b981' }}>
+                        {CHARGING_BASE_ESTADO_LABEL[station.estado] || station.estado}
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Domo:</span>
+                      <span>{station.domo_estado || '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Batería reportada:</span>
+                      <strong style={{ color: '#00649c' }}>
+                        {Math.round(station.bateria_porcentaje ?? 0)}%
+                      </strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Voltaje del pad:</span>
+                      <span>{station.voltaje_v != null ? `${Number(station.voltaje_v).toFixed(1)} V` : '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Temperatura:</span>
+                      <span>{station.temperatura_c != null ? `${Number(station.temperatura_c).toFixed(1)} °C` : '—'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Ciclos de recarga completados:</span>
+                      <span>{station.ciclos_completados ?? 0}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Último acoplamiento:</span>
+                      <span>
+                        {station.ultimo_acoplamiento_at
+                          ? new Date(station.ultimo_acoplamiento_at).toLocaleString('es-MX')
+                          : 'Sin registros'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-ajustes-modal-confirm"
+                      onClick={() => handleDockAndRecharge(station.station_id)}
+                      disabled={dockingStationId !== null}
+                      title={`Acoplar y cargar al 100% en ${station.nombre || station.station_id}`}
+                    >
+                      {dockingStationId === station.station_id ? 'Acoplando…' : 'Acoplar y recargar'}
+                    </button>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Estado de la base:</span>
-                    <strong style={{ color: '#10b981' }}>
-                      {CHARGING_BASE_ESTADO_LABEL[chargingBase.estado] || chargingBase.estado}
-                    </strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Batería reportada:</span>
-                    <strong style={{ color: '#00649c' }}>
-                      {Math.round(chargingBase.bateria_porcentaje)}%
-                    </strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Radio de acoplamiento:</span>
-                    <span>{chargingBase.dock_radius_m} m alrededor de HOME</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Distancia a HOME:</span>
-                    <span>
-                      {chargingBase.distancia_home_m != null
-                        ? `${Number(chargingBase.distancia_home_m).toFixed(1)} m`
-                        : '—'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Ciclos de recarga completados:</span>
-                    <span>{chargingBase.ciclos_completados ?? 0}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Último acoplamiento:</span>
-                    <span>
-                      {chargingBase.ultimo_acoplamiento_at
-                        ? new Date(chargingBase.ultimo_acoplamiento_at).toLocaleString('es-MX')
-                        : 'Sin registros'}
-                    </span>
-                  </div>
-                </div>
+                ))
               ) : (
-                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '13px', color: '#64748b' }}>
-                  Sin conexión con el backend — no se pudo consultar el estado de la
-                  estación de carga (GET /drone/charging-base).
-                </div>
+                <StatusPlaceholder
+                  compact
+                  variant={
+                    chargingBasesError
+                      ? chargingBasesError.isOffline
+                        ? 'offline'
+                        : 'error'
+                      : 'empty'
+                  }
+                  title={
+                    chargingBasesError
+                      ? chargingBasesError.isOffline
+                        ? 'Sin conexión'
+                        : 'Error al consultar estaciones'
+                      : 'Sin estaciones registradas'
+                  }
+                  message={describeApiError(
+                    chargingBasesError,
+                    'El servidor no reporta estaciones de carga registradas.',
+                  )}
+                  actionLabel="Reintentar"
+                  onAction={refreshChargingBases}
+                />
               )}
               <p style={{ fontSize: '12px', color: '#64748b' }}>
                 La recarga por inducción requiere que el dron esté aterrizado dentro
-                del radio de acoplamiento del punto HOME.
+                del radio de acoplamiento de la estación seleccionada.
               </p>
             </div>
             <div className="ajustes-modal-actions" style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn-ajustes-modal-cancel"
-                onClick={handleDockAndRecharge}
-                disabled={isDocking || !chargingBase}
-                style={{ flex: 1 }}
-                title={chargingBase ? 'Acoplar y cargar la batería al 100%' : 'Requiere conexión con el backend'}
-              >
-                {isDocking ? 'Acoplando…' : 'Acoplar y recargar'}
-              </button>
               <button
                 type="button"
                 className="btn-ajustes-modal-cancel"
@@ -1242,6 +1447,167 @@ export default function Ajustes({ initialView = 'main' }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal 8: Cambiar Contraseña (POST /auth/change-password) */}
+      {isPasswordModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pwd-title">
+          <div className="ajustes-modal-card">
+            <div className="ajustes-modal-header">
+              <h2 id="pwd-title">Cambiar Contraseña</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsPasswordModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitPasswordChange}>
+              <div className="ajustes-modal-body">
+                <p>
+                  Al actualizar tu contraseña se revocará la sesión actual y deberás
+                  iniciar sesión de nuevo.
+                </p>
+                <div className="modal-options-list">
+                  <label className="form-label-block" style={{ display: 'block' }}>
+                    <span>Contraseña actual</span>
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={pwdForm.current}
+                      onChange={(e) => setPwdForm({ ...pwdForm, current: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label className="form-label-block" style={{ display: 'block' }}>
+                    <span>Nueva contraseña (mín. 8 caracteres)</span>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={8}
+                      value={pwdForm.next}
+                      onChange={(e) => setPwdForm({ ...pwdForm, next: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label className="form-label-block" style={{ display: 'block' }}>
+                    <span>Confirmar nueva contraseña</span>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={8}
+                      value={pwdForm.confirm}
+                      onChange={(e) => setPwdForm({ ...pwdForm, confirm: e.target.value })}
+                      required
+                    />
+                  </label>
+                </div>
+                {pwdError && (
+                  <p style={{ fontSize: '12px', color: '#dc2626' }} role="alert">
+                    {pwdError}
+                  </p>
+                )}
+              </div>
+              <div className="ajustes-modal-actions">
+                <button
+                  type="button"
+                  className="btn-ajustes-modal-cancel"
+                  onClick={() => setIsPasswordModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn-ajustes-modal-confirm"
+                  disabled={pwdSaving}
+                >
+                  {pwdSaving ? 'Actualizando…' : 'Actualizar contraseña'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 9: Visor de Bitácora de Auditoría (GET /audit/) */}
+      {isAuditModalOpen && (
+        <div className="ajustes-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="audit-title">
+          <div className="ajustes-modal-card" style={{ maxWidth: '560px' }}>
+            <div className="ajustes-modal-header">
+              <h2 id="audit-title">Bitácora de Auditoría</h2>
+              <button
+                type="button"
+                className="ajustes-modal-close"
+                onClick={() => setIsAuditModalOpen(false)}
+                aria-label="Cerrar modal"
+              >
+                <CloseModalIcon size={18} />
+              </button>
+            </div>
+            <div className="ajustes-modal-body">
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                <label htmlFor="audit-filter" style={{ fontSize: '12px', color: '#64748b' }}>
+                  Filtrar por acción:
+                </label>
+                <input
+                  id="audit-filter"
+                  type="text"
+                  placeholder="LOGIN, REGISTRO_USUARIO…"
+                  value={auditActionFilter}
+                  onChange={(e) => setAuditActionFilter(e.target.value)}
+                  style={{ flex: 1, padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                />
+              </div>
+              {auditLoading ? (
+                <p style={{ fontSize: '13px', color: '#64748b' }}>Cargando eventos de auditoría…</p>
+              ) : auditError ? (
+                <p style={{ fontSize: '13px', color: '#dc2626' }} role="alert">{auditError}</p>
+              ) : filteredAuditLogs.length === 0 ? (
+                <p style={{ fontSize: '13px', color: '#64748b' }}>
+                  Sin eventos registrados para el filtro seleccionado.
+                </p>
+              ) : (
+                <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {filteredAuditLogs.map((row) => (
+                    <div
+                      key={row.id}
+                      style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '3px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <strong style={{ color: '#0f172a' }}>{row.accion}</strong>
+                        <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>
+                          {row.timestamp ? new Date(row.timestamp).toLocaleString('es-MX') : '—'}
+                        </span>
+                      </div>
+                      <span style={{ color: '#475569' }}>
+                        {row.recurso || '—'} · IP {row.ip_origen || '—'}
+                        {row.usuario_id != null ? ` · usuario #${row.usuario_id}` : ''}
+                      </span>
+                      {row.detalle && (
+                        <span style={{ color: '#64748b' }}>{row.detalle}</span>
+                      )}
+                      <span style={{ color: '#94a3b8', fontFamily: 'monospace' }}>
+                        SHA-256 {row.hash_sha256 ? row.hash_sha256.slice(0, 16) : '—'}…
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="ajustes-modal-actions">
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={() => setIsAuditModalOpen(false)}
+                style={{ width: '100%', flex: 'none' }}
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}

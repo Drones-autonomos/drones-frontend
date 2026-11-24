@@ -262,8 +262,14 @@
    ========================================================================== */
 .flight-cards-list {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 18px;
+}
+
+.flight-cards-list > .empty-bitacora {
+  flex: 1;
+  justify-content: center;
 }
 
 .flight-card-bitacora {
@@ -488,6 +494,38 @@
   font-size: 11.5px;
   color: #cbd5e1;
   max-width: 260px;
+}
+
+/* Estado neutro cuando el vuelo no tiene grabación (sin póster ilustrado) */
+.video-player__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%);
+  color: #64748b;
+  padding: 16px;
+  text-align: center;
+}
+
+.video-player__empty strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.video-player__empty p {
+  margin: 0;
+  font-size: 11.5px;
+  color: #64748b;
+  max-width: 240px;
+}
+
+.video-player__empty--playable {
+  color: #475569;
 }
 
 /* ==========================================================================

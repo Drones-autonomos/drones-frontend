@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import GuardiaBottomNav from '../../components/GuardiaBottomNav.jsx'
+import aeroluferanLogo from '../../assets/aeroluferan-logo.png'
 import {
-  AeroHelmetLogo,
   AlertWarningIcon,
   ArrowsSwitchIcon,
   BatteryGaugeIcon,
@@ -26,7 +26,12 @@ import {
 } from '../Admin/bitacoraData.js'
 import { getCurrentUser, logoutUser } from '../Admin/authSession.js'
 import { getOrCreateFlightVideoUrl } from '../Admin/videoDemoHelper.js'
-import { refreshFlightLog } from '../../services/flightLogService.js'
+import {
+  getFlightLogSyncState,
+  refreshFlightLog,
+  verifyFlightLogIntegrity,
+} from '../../services/flightLogService.js'
+import StatusPlaceholder from '../../components/StatusPlaceholder.jsx'
 import './Bitacora.css'
 
 /**
@@ -38,14 +43,20 @@ function FlightHistoryCard({
   onOpenVideo,
   onOpenAudit,
 }) {
-  const retention = useMemo(() => calculateRetention(flight.storedAt), [flight.storedAt])
+  const retention = useMemo(
+    () => calculateRetention(flight.storedAt, flight.video),
+    [flight.storedAt, flight.video],
+  )
+  const isPurged = Boolean(flight.video?.isPurged)
+  const hasRecording = Boolean(flight.video?.recordingId)
+  const isUnavailable = retention.isExpired || isPurged
   const [isPlayingInCard, setIsPlayingInCard] = useState(false)
   const [videoSrc, setVideoSrc] = useState(flight.video.videoUrl || null)
   const videoRef = useRef(null)
 
   // Cargar stream de video si el usuario reproduce directamente en la tarjeta
   async function handleToggleInCardPlay() {
-    if (retention.isExpired) return
+    if (isUnavailable || !hasRecording) return
 
     if (!videoSrc) {
       const generatedUrl = await getOrCreateFlightVideoUrl(flight)
@@ -105,13 +116,15 @@ function FlightHistoryCard({
           <span>{flight.dateDisplay}</span>
         </div>
 
-        <div
-          className={`retention-indicator retention-indicator--${retention.statusType}`}
-          title={retention.description}
-        >
-          <CalendarRetentionIcon size={12} />
-          <span>{retention.label}</span>
-        </div>
+        {(hasRecording || isPurged) && (
+          <div
+            className={`retention-indicator retention-indicator--${retention.statusType}`}
+            title={retention.description}
+          >
+            <CalendarRetentionIcon size={12} />
+            <span>{retention.label}</span>
+          </div>
+        )}
       </div>
 
       {/* 4. Reproductor de video nativo HTML5 */}
@@ -121,18 +134,28 @@ function FlightHistoryCard({
           {flight.video.title}
         </span>
 
-        {retention.isExpired ? (
+        {!hasRecording && !isPurged ? (
+          <div className="video-player__empty">
+            <CameraRecordIcon size={30} />
+            <strong>Sin grabación disponible</strong>
+            <p>Este vuelo no tiene video registrado en el servidor.</p>
+          </div>
+        ) : isUnavailable ? (
           <div className="video-player__expired-overlay">
             <AlertWarningIcon size={28} color="#fca5a5" />
-            <strong>Grabación no disponible</strong>
-            <p>El archivo de video ha superado el límite de 30 días de retención legal y fue purgado del servidor.</p>
+            <strong>{isPurged ? 'Grabación purgada por retención' : 'Grabación no disponible'}</strong>
+            <p>
+              {isPurged
+                ? 'El archivo de video fue purgado por retención normativa; el sello criptográfico SHA-256 se conserva intacto en la Bitácora.'
+                : `El archivo de video ha superado el límite de ${retention.configuredDays || 30} días de retención normativa y fue purgado del servidor.`}
+            </p>
           </div>
         ) : isPlayingInCard ? (
           <video
             ref={videoRef}
             className="video-player__media"
             src={videoSrc || undefined}
-            poster={flight.video.poster}
+            poster={flight.video.poster || undefined}
             controls
             autoPlay
             playsInline
@@ -142,11 +165,17 @@ function FlightHistoryCard({
           </video>
         ) : (
           <>
-            <img
-              className="video-player__media"
-              src={flight.video.poster}
-              alt={`Fotograma de patrullaje de ${flight.missionName}`}
-            />
+            {flight.video.poster ? (
+              <img
+                className="video-player__media"
+                src={flight.video.poster}
+                alt={`Fotograma de patrullaje de ${flight.missionName}`}
+              />
+            ) : (
+              <div className="video-player__empty video-player__empty--playable" aria-hidden="true">
+                <CameraRecordIcon size={34} />
+              </div>
+            )}
             <button
               type="button"
               className="video-player__play-overlay"
@@ -198,11 +227,11 @@ function FlightHistoryCard({
         <button
           type="button"
           className={`btn-view-recording btn-view-recording--${flight.buttonVariant || 'solid'}`}
-          disabled={retention.isExpired}
+          disabled={isUnavailable}
           onClick={() => onOpenVideo(flight)}
           title={
-            retention.isExpired
-              ? 'La grabación ha expirado y ya no se encuentra alojada en el servidor.'
+            isUnavailable
+              ? 'La grabación fue purgada o ha expirado; consulta su sello SHA-256 arriba.'
               : `Abrir visor completo de grabación del Vuelo ${flight.flightNumber}`
           }
         >
@@ -320,7 +349,7 @@ function VideoModal({ flight, onClose }) {
           <video
             ref={videoPlayerRef}
             src={videoUrl || undefined}
-            poster={flight.video.poster}
+            poster={flight.video.poster || undefined}
             controls
             autoPlay
             playsInline
@@ -363,7 +392,34 @@ function VideoModal({ flight, onClose }) {
  * Modal de verificación de Integridad Criptográfica SHA-256
  */
 function AuditDetailModal({ flight, onClose }) {
+  const [verificationState, setVerificationState] = useState({ logId: null, result: null })
+  const logId = flight?.flightLogId ?? null
+
+  useEffect(() => {
+    if (!logId) return undefined
+    let cancelled = false
+    verifyFlightLogIntegrity(flight)
+      .then((res) => {
+        if (!cancelled) {
+          setVerificationState({ logId, result: res })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setVerificationState({ logId, result: null })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [flight, logId])
+
   if (!flight) return null
+
+  const verifying = Boolean(logId) && verificationState.logId !== logId
+  const verification = logId && verificationState.logId === logId ? verificationState.result : null
+  const serverVerified = verification ? Boolean(verification.hash_valid && verification.chain_valid) : null
+  const prevHash = verification?.prev_hash || flight.integrity.prevHash
 
   return (
     <div
@@ -389,9 +445,25 @@ function AuditDetailModal({ flight, onClose }) {
         </div>
 
         <div className="bitacora-modal-body">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#15803d', fontWeight: '750' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: serverVerified === false ? '#dc2626' : '#15803d',
+              fontWeight: '750',
+            }}
+          >
             <CheckShieldHashIcon size={20} />
-            <span>Integridad Verificada en Nodo de Auditoría</span>
+            <span>
+              {verifying
+                ? 'Verificando cadena criptográfica en servidor...'
+                : serverVerified === true
+                  ? 'Cadena SHA-256 Verificada en Servidor'
+                  : serverVerified === false
+                    ? 'Alerta: Discrepancia detectada en el sello SHA-256'
+                    : 'Integridad Verificada en Nodo de Auditoría'}
+            </span>
           </div>
 
           <div className="modal-session-detail">
@@ -401,16 +473,22 @@ function AuditDetailModal({ flight, onClose }) {
             <strong>{flight.integrity.blockNumber}</strong>
             <span>Hash SHA-256 completo:</span>
             <code style={{ fontSize: '11px', wordBreak: 'break-all', background: '#e2e8f0', padding: '4px', borderRadius: '4px' }}>
-              {flight.integrity.fullHash}
+              {verification?.hash_sha256 || flight.integrity.fullHash}
             </code>
+            {prevHash && (
+              <>
+                <span>Hash eslabón previo (cadena):</span>
+                <code style={{ fontSize: '10.5px', wordBreak: 'break-all', background: '#f1f5f9', padding: '4px', borderRadius: '4px' }}>
+                  {prevHash}
+                </code>
+              </>
+            )}
             <span>Estampa de tiempo del sellado:</span>
             <small>{flight.integrity.timestamp} UTC</small>
           </div>
 
           <p style={{ fontSize: '12px', color: '#64748b' }}>
-            {flight.integrity.isSimulated
-              ? 'Nota: En este entorno de demostración se utiliza un registro simulado preparado para la sincronización con el servicio de auditoría inmutable de la base de datos.'
-              : 'El hash criptográfico garantiza que la telemetría, alertas y metadatos no han sido alterados tras el aterrizaje.'}
+            El hash criptográfico encadenado garantiza que la telemetría, operador, alertas y metadatos no han sido alterados tras el aterrizaje.
           </p>
         </div>
 
@@ -445,6 +523,7 @@ export default function GuardiaBitacora() {
 
   // 2. Historial de vuelos
   const [flights, setFlights] = useState(getStoredFlights)
+  const [syncStatus, setSyncStatus] = useState(getFlightLogSyncState)
 
   useEffect(() => {
     function syncFlights() {
@@ -455,12 +534,23 @@ export default function GuardiaBitacora() {
   }, [])
 
   // Sincronizar con el backend (misiones + grabaciones + telemetría + eventos)
+  function reloadFlightLog() {
+    refreshFlightLog().then((result) => {
+      if (Array.isArray(result)) {
+        setFlights(getStoredFlights())
+      }
+      setSyncStatus(getFlightLogSyncState())
+    })
+  }
+
   useEffect(() => {
     let isMounted = true
     refreshFlightLog().then((result) => {
-      if (isMounted && Array.isArray(result)) {
+      if (!isMounted) return
+      if (Array.isArray(result)) {
         setFlights(getStoredFlights())
       }
+      setSyncStatus(getFlightLogSyncState())
     })
     return () => {
       isMounted = false
@@ -524,7 +614,11 @@ export default function GuardiaBitacora() {
         {/* ============================================================== */}
         <header className="bitacora-header">
           <div className="bitacora-brand">
-            <AeroHelmetLogo size={38} />
+            <img
+              src={aeroluferanLogo}
+              alt="Emblema AeroLuferan"
+              style={{ width: 38, height: 38, objectFit: 'contain', flexShrink: 0 }}
+            />
             <h1 className="bitacora-brand-title">AeroLuferan</h1>
           </div>
         </header>
@@ -623,13 +717,14 @@ export default function GuardiaBitacora() {
                   onOpenAudit={(selected) => setSelectedAuditFlight(selected)}
                 />
               ))
-            ) : (
+            ) : searchQuery !== '' || activeFilter === 'incidentes' ? (
               <div className="empty-bitacora">
                 <SearchGlassIcon size={36} color="#94a3b8" />
                 <h3>No se encontraron vuelos</h3>
                 <p>
-                  No existen registros en la bitácora que coincidan con «{searchQuery}»
-                  {activeFilter === 'incidentes' ? ' y el filtro de incidentes' : ''}.
+                  No existen registros en la bitácora
+                  {searchQuery !== '' && <> que coincidan con «{searchQuery}»</>}
+                  {activeFilter === 'incidentes' ? ' con incidentes' : ''}.
                 </p>
                 <button
                   type="button"
@@ -642,6 +737,26 @@ export default function GuardiaBitacora() {
                   Restablecer filtros
                 </button>
               </div>
+            ) : syncStatus === 'offline' || syncStatus === 'unauthenticated' ? (
+              <StatusPlaceholder
+                variant="offline"
+                title="Sin conexión"
+                message="No se pudo sincronizar la bitácora con el servidor. Los registros aparecerán al restablecer la conexión."
+                actionLabel="Reintentar"
+                onAction={reloadFlightLog}
+              />
+            ) : syncStatus === 'syncing' || syncStatus === 'idle' ? (
+              <StatusPlaceholder
+                variant="empty"
+                title="Sincronizando bitácora…"
+                message="Consultando el historial de vuelos en el servidor."
+              />
+            ) : (
+              <StatusPlaceholder
+                variant="empty"
+                title="Sin vuelos registrados"
+                message="La bitácora aún no tiene vuelos. Los registros aparecen aquí cuando se ejecutan misiones."
+              />
             )}
           </section>
         </main>
