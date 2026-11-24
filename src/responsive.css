@@ -105,11 +105,11 @@
 
   body .alertas-shell,
   body .alertas-guardia-shell {
-    width: min(100%, 1100px);
+    width: min(100%, 1180px);
   }
 
   body .ajustes-shell {
-    width: min(100%, 920px);
+    width: min(100%, 1180px);
   }
 
   /* ------------------------------------------------------------------
@@ -231,7 +231,21 @@
   }
 
   /* ------------------------------------------------------------------
-     8. MODALES: un poco más de aire en pantalla grande
+     8. AJUSTES (Admin + Guardia + Usuarios): grupos en 2 columnas
+     ------------------------------------------------------------------ */
+  body .ajustes-content {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* Perfil, edición y cualquier hijo que no sea tarjeta de grupo van a lo ancho */
+  body .ajustes-content > :not(.ajustes-group-card) {
+    grid-column: 1 / -1;
+  }
+
+  /* ------------------------------------------------------------------
+     9. MODALES: un poco más de aire en pantalla grande
      ------------------------------------------------------------------ */
   body .ajustes-modal-card {
     width: min(100%, 560px);
@@ -276,7 +290,7 @@
   }
 
   body .ajustes-shell {
-    width: min(calc(100% - 48px), 1120px);
+    width: min(calc(100% - 48px), 1400px);
   }
 
   body .campus-map-box {
