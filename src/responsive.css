@@ -109,6 +109,23 @@
     max-width: none;
   }
 
+  /* Escala de consola: la UI base se diseñó a escala móvil, así que
+     en escritorio los componentes se veían pequeños y alejados.
+     `zoom` amplía proporcionalmente tipografía, tarjetas e iconos
+     (estilo de la pantalla En Vivo). Como zoom también multiplica
+     las unidades `vh`, los cálculos con 100vh se dividen entre el
+     factor para conservar su tamaño efectivo. */
+  body .rutas-shell,
+  body .bitacora-shell,
+  body .programar-ruta-shell,
+  body .alertas-shell,
+  body .alertas-guardia-shell,
+  body .ajustes-shell,
+  body .admin-placeholder-page,
+  body .guardia-placeholder-page {
+    zoom: 1.2;
+  }
+
   /* ------------------------------------------------------------------
      3. RUTAS (Admin + Guardia): mapa a la izquierda, rail de misiones
         a la derecha que se extiende junto a todo el contenido
@@ -145,11 +162,11 @@
     grid-row: 2 / span 8;
     position: sticky;
     top: 16px;
-    max-height: calc(100vh - 32px);
+    max-height: calc((100vh - 32px) / 1.2);
   }
 
   body .vuelos-programados-section > .vuelos-cards-list {
-    max-height: calc(100vh - 110px);
+    max-height: calc((100vh - 110px) / 1.2);
     overflow-y: auto;
     padding-right: 6px;
     scrollbar-width: thin;
@@ -288,6 +305,26 @@
    ESCRITORIO AMPLIO (≥1600px): aprovechar pantallas grandes/ultrawide
    ========================================================================== */
 @media (min-width: 1600px) {
+  /* Escala mayor en pantallas amplias */
+  body .rutas-shell,
+  body .bitacora-shell,
+  body .programar-ruta-shell,
+  body .alertas-shell,
+  body .alertas-guardia-shell,
+  body .ajustes-shell,
+  body .admin-placeholder-page,
+  body .guardia-placeholder-page {
+    zoom: 1.35;
+  }
+
+  body .rutas-content > .vuelos-programados-section {
+    max-height: calc((100vh - 32px) / 1.35);
+  }
+
+  body .vuelos-programados-section > .vuelos-cards-list {
+    max-height: calc((100vh - 110px) / 1.35);
+  }
+
   body .campus-map-box {
     height: 560px;
   }
