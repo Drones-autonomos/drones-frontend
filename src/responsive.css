@@ -96,34 +96,21 @@
     padding-left: 236px;
   }
 
-  /* Shells: de columna móvil a ancho completo tras el sidebar.
-     Sin tope fijo — el ancho disponible se aprovecha siempre;
-     el respiro lateral lo da el padding interno de cada página. */
+  /* Shells: ancho completo tras el sidebar con escala de consola.
+     La UI base es mobile-scale y en escritorio se veía pequeña;
+     `zoom` amplía tipografía, tarjetas e iconos proporcionalmente.
+     El ancho se divide entre el factor porque zoom escala también
+     el 100% (sin esto el shell desborda y se recorta bajo el
+     sidebar); igualmente los calc(100vh…) se dividen abajo. */
   body .rutas-shell,
   body .bitacora-shell,
   body .programar-ruta-shell,
   body .alertas-shell,
   body .alertas-guardia-shell,
   body .ajustes-shell {
-    width: 100%;
+    width: calc(100% / 1.15);
     max-width: none;
-  }
-
-  /* Escala de consola: la UI base se diseñó a escala móvil, así que
-     en escritorio los componentes se veían pequeños y alejados.
-     `zoom` amplía proporcionalmente tipografía, tarjetas e iconos
-     (estilo de la pantalla En Vivo). Como zoom también multiplica
-     las unidades `vh`, los cálculos con 100vh se dividen entre el
-     factor para conservar su tamaño efectivo. */
-  body .rutas-shell,
-  body .bitacora-shell,
-  body .programar-ruta-shell,
-  body .alertas-shell,
-  body .alertas-guardia-shell,
-  body .ajustes-shell,
-  body .admin-placeholder-page,
-  body .guardia-placeholder-page {
-    zoom: 1.2;
+    zoom: 1.15;
   }
 
   /* ------------------------------------------------------------------
@@ -162,11 +149,11 @@
     grid-row: 2 / span 8;
     position: sticky;
     top: 16px;
-    max-height: calc((100vh - 32px) / 1.2);
+    max-height: calc((100vh - 32px) / 1.15);
   }
 
   body .vuelos-programados-section > .vuelos-cards-list {
-    max-height: calc((100vh - 110px) / 1.2);
+    max-height: calc((100vh - 110px) / 1.15);
     overflow-y: auto;
     padding-right: 6px;
     scrollbar-width: thin;
@@ -305,24 +292,23 @@
    ESCRITORIO AMPLIO (≥1600px): aprovechar pantallas grandes/ultrawide
    ========================================================================== */
 @media (min-width: 1600px) {
-  /* Escala mayor en pantallas amplias */
+  /* Escala un poco mayor en pantallas amplias */
   body .rutas-shell,
   body .bitacora-shell,
   body .programar-ruta-shell,
   body .alertas-shell,
   body .alertas-guardia-shell,
-  body .ajustes-shell,
-  body .admin-placeholder-page,
-  body .guardia-placeholder-page {
-    zoom: 1.35;
+  body .ajustes-shell {
+    width: calc(100% / 1.25);
+    zoom: 1.25;
   }
 
   body .rutas-content > .vuelos-programados-section {
-    max-height: calc((100vh - 32px) / 1.35);
+    max-height: calc((100vh - 32px) / 1.25);
   }
 
   body .vuelos-programados-section > .vuelos-cards-list {
-    max-height: calc((100vh - 110px) / 1.35);
+    max-height: calc((100vh - 110px) / 1.25);
   }
 
   body .campus-map-box {
