@@ -1,0 +1,284 @@
+/* ==========================================================================
+   RESPONSIVE DESKTOP — AeroLuferan
+   El diseño base es mobile (columna ~460px + bottom-nav). En pantallas de
+   escritorio (≥1024px) la interfaz cambia a layout de consola:
+     - El bottom-nav se convierte en sidebar fijo a la izquierda (236px).
+     - Los shells se ensanchan y el contenido se reparte en grids.
+   Todo vive dentro de una sola media query: el móvil queda intacto.
+   Los selectores llevan prefijo `body` para ganar la cascada contra el CSS
+   por página independientemente del orden de carga de Vite.
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+  /* ------------------------------------------------------------------
+     1. NAVEGACIÓN: bottom-nav → sidebar lateral
+     ------------------------------------------------------------------ */
+  body .admin-bottom-nav,
+  body .guardia-bottom-nav {
+    position: fixed;
+    z-index: 50;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 236px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    margin: 0;
+    padding: 20px 12px;
+    border-top: 0;
+    border-right: 2px solid #e8eaff;
+    background: #fff;
+    box-shadow: 4px 0 16px rgb(42 56 93 / 4%);
+  }
+
+  body .admin-bottom-nav::before,
+  body .guardia-bottom-nav::before {
+    content: 'AeroLuferan';
+    display: block;
+    margin-bottom: 14px;
+    padding: 4px 14px 18px;
+    border-bottom: 1.5px solid #eef1f7;
+    color: #172f52;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+
+  body .admin-nav-link,
+  body .guardia-nav-link {
+    min-height: 0;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    transition: background-color 120ms ease;
+  }
+
+  body .admin-nav-link:hover,
+  body .guardia-nav-link:hover {
+    background: #f3f7fb;
+  }
+
+  body .admin-nav-link.is-active,
+  body .guardia-nav-link.is-active {
+    background: #e9f4fc;
+  }
+
+  body .admin-nav-icon svg,
+  body .guardia-nav-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* ------------------------------------------------------------------
+     2. OFFSET DE PÁGINA: el contenido cede el ancho del sidebar
+     ------------------------------------------------------------------ */
+  body .rutas-page,
+  body .alertas-page,
+  body .alertas-guardia-page,
+  body .bitacora-page,
+  body .ajustes-page,
+  body .programar-ruta-page,
+  body .admin-placeholder-page,
+  body .guardia-placeholder-page {
+    padding-left: 236px;
+  }
+
+  body .admin-live-page {
+    width: 100%;
+    padding-left: 236px;
+  }
+
+  /* Shells: de columna móvil a ancho de consola */
+  body .rutas-shell,
+  body .bitacora-shell,
+  body .programar-ruta-shell {
+    width: min(100%, 1180px);
+  }
+
+  body .alertas-shell,
+  body .alertas-guardia-shell {
+    width: min(100%, 1100px);
+  }
+
+  body .ajustes-shell {
+    width: min(100%, 920px);
+  }
+
+  /* ------------------------------------------------------------------
+     3. RUTAS (Admin + Guardia): mapa a la izquierda, misiones a la derecha
+     ------------------------------------------------------------------ */
+  body .rutas-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  body .rutas-content > .autonomous-card,
+  body .rutas-content > .route-warning-banner,
+  body .rutas-content > .prevuelo-card,
+  body .rutas-content > .btn-programar-ruta {
+    grid-column: 1 / -1;
+  }
+
+  body .rutas-content > .campus-card {
+    grid-column: 1;
+  }
+
+  body .rutas-content > .vuelos-programados-section {
+    grid-column: 2;
+  }
+
+  body .campus-map-box {
+    height: 460px;
+  }
+
+  /* ------------------------------------------------------------------
+     4. EN VIVO (Admin + Guardia): video 2/3 + rail de telemetría
+     ------------------------------------------------------------------ */
+  body .live-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    align-items: start;
+    padding-bottom: 48px;
+  }
+
+  body .live-content > .flight-card {
+    grid-column: 1 / -1;
+  }
+
+  body .live-content > .live-preview-section {
+    grid-column: 1;
+    grid-row: span 3;
+  }
+
+  body .live-content > .telemetry-grid {
+    grid-column: 2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body .live-content > .quick-actions,
+  body .live-content > .heliport-card {
+    grid-column: 2;
+  }
+
+  /* ------------------------------------------------------------------
+     5. ALERTAS (Admin + Guardia): tarjetas en retícula
+     ------------------------------------------------------------------ */
+  body .alerts-list,
+  body .alertas-guardia-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    align-content: start;
+    padding: 0 24px 24px;
+  }
+
+  /* ------------------------------------------------------------------
+     6. BITÁCORA (Admin + Guardia): historial en retícula
+     ------------------------------------------------------------------ */
+  body .flight-cards-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    align-items: start;
+  }
+
+  /* ------------------------------------------------------------------
+     7. PROGRAMAR RUTA: mapa protagonista + planificación al costado
+     ------------------------------------------------------------------ */
+  body .programar-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  body .programar-content > .checklist-card,
+  body .programar-content > .mission-name-card,
+  body .programar-content > .preset-routes-card,
+  body .programar-content > .programar-feedback-alert,
+  body .programar-content > .programar-feedback-success,
+  body .programar-content > .btn-programar-vuelo-primary {
+    grid-column: 1 / -1;
+  }
+
+  body .programar-content > .telemetry-card-section {
+    grid-column: 1;
+    grid-row: span 2;
+  }
+
+  body .programar-content > .planificar-vuelo-section {
+    grid-column: 2;
+  }
+
+  body .programar-map-wrapper {
+    height: 520px;
+  }
+
+  /* ------------------------------------------------------------------
+     8. MODALES: un poco más de aire en pantalla grande
+     ------------------------------------------------------------------ */
+  body .ajustes-modal-card {
+    width: min(100%, 560px);
+  }
+}
+
+/* ==========================================================================
+   TABLET (700–1023px): el marco móvil se ensancha; el bottom-nav permanece
+   ========================================================================== */
+@media (min-width: 700px) and (max-width: 1023.98px) {
+  body .rutas-shell,
+  body .bitacora-shell,
+  body .programar-ruta-shell,
+  body .alertas-shell,
+  body .alertas-guardia-shell,
+  body .ajustes-shell {
+    width: min(100%, 720px);
+  }
+
+  body .campus-map-box {
+    height: 380px;
+  }
+
+  body .programar-map-wrapper {
+    height: 420px;
+  }
+}
+
+/* ==========================================================================
+   ESCRITORIO AMPLIO (≥1600px): aprovechar pantallas grandes/ultrawide
+   ========================================================================== */
+@media (min-width: 1600px) {
+  body .rutas-shell,
+  body .bitacora-shell,
+  body .programar-ruta-shell {
+    width: min(calc(100% - 48px), 1560px);
+  }
+
+  body .alertas-shell,
+  body .alertas-guardia-shell {
+    width: min(calc(100% - 48px), 1420px);
+  }
+
+  body .ajustes-shell {
+    width: min(calc(100% - 48px), 1120px);
+  }
+
+  body .campus-map-box {
+    height: 560px;
+  }
+
+  body .programar-map-wrapper {
+    height: 640px;
+  }
+
+  /* En Vivo: el video gana protagonismo frente al rail de telemetría */
+  body .live-content {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
