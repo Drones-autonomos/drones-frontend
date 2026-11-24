@@ -33,6 +33,7 @@ import {
   listMissions,
   startMission,
   cancelMission,
+  confirmMissionLanded,
   MISSIONS_UPDATED_EVENT,
 } from '../../../services/missionService.js'
 import {
@@ -105,7 +106,10 @@ export default function GuardiaRutas() {
     window.addEventListener(MISSIONS_UPDATED_EVENT, syncSharedData)
     window.addEventListener('aeroluferan_geofences_updated', syncSharedData)
     window.addEventListener('aeroluferan_autonomous_updated', syncSharedData)
-    const intervalId = window.setInterval(() => loadMissions({ silent: true }), 20000)
+    const intervalId = window.setInterval(() => {
+      loadMissions({ silent: true })
+      syncGeofences()
+    }, 20000)
 
     return () => {
       window.clearTimeout(initialTimer)
@@ -253,6 +257,30 @@ export default function GuardiaRutas() {
       setFlightStatusMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'No se pudo cancelar la misión.',
+      })
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
+  // Confirmación de aterrizaje tras interrupción (RECUPERACION → FINALIZADA).
+  // Nota de roles: el endpoint es solo ADMIN; para GUARDIA responde 403 y el
+  // mensaje del servidor se muestra en flightStatusMessage.
+  async function handleConfirmLanded(mission, event) {
+    event?.stopPropagation?.()
+    setFlightStatusMessage(null)
+    try {
+      setPendingActionId(mission.id)
+      const landed = await confirmMissionLanded(mission.id)
+      setFlightStatusMessage({
+        type: 'success',
+        text: `Aterrizaje de "${landed.name}" confirmado — misión ${landed.estado}.`,
+      })
+      await loadMissions({ silent: true })
+    } catch (error) {
+      setFlightStatusMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo confirmar el aterrizaje.',
       })
     } finally {
       setPendingActionId(null)
@@ -627,6 +655,17 @@ export default function GuardiaRutas() {
                             title={mission.estado === 'EN_CURSO' ? 'Cancelar ejecución (RTL)' : 'Cancelar misión'}
                           >
                             {pendingActionId === mission.id ? '…' : 'Cancelar'}
+                          </button>
+                        )}
+                        {mission.estado === 'RECUPERACION' && (
+                          <button
+                            type="button"
+                            className="vuelo-cancel-btn"
+                            disabled={pendingActionId === mission.id}
+                            onClick={(e) => handleConfirmLanded(mission, e)}
+                            title="Confirmar que el dron aterrizó y liberar la reserva (requiere rol Admin)"
+                          >
+                            {pendingActionId === mission.id ? '…' : 'Confirmar aterrizaje'}
                           </button>
                         )}
                       </div>

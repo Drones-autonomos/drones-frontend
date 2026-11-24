@@ -135,6 +135,15 @@ export function CompressIcon() {
   )
 }
 
+export function CameraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 7h3l2-2h6l2 2h3v12H4z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
+  )
+}
+
 export function LiveIcon() {
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true">

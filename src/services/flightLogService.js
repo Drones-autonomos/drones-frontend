@@ -12,6 +12,7 @@
 
 import apiClient, { getAuthToken } from './apiClient.js'
 import campusReference from '../assets/campus-reference.svg'
+import { BITACORA_SYNCED_KEY } from '../pages/Admin/bitacoraData.js'
 
 export const BITACORA_UPDATED_EVENT = 'aeroluferan_bitacora_updated'
 export const MAX_RETENTION_DAYS = 30
@@ -293,6 +294,7 @@ export async function refreshFlightLog() {
 
     try {
       localStorage.setItem('aeroluferan_bitacora_flights', JSON.stringify(flights))
+      localStorage.setItem(BITACORA_SYNCED_KEY, '1')
       window.dispatchEvent(new CustomEvent(BITACORA_UPDATED_EVENT, { detail: flights }))
     } catch (error) {
       console.error('Error al persistir bitácora:', error)

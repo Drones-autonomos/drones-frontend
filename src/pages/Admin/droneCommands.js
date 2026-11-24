@@ -15,3 +15,7 @@ export async function requestReturnToBase(heliportId) {
 export async function requestEmergencyStop() {
   return await droneControlService.emergencyStop()
 }
+
+export async function requestArmFailsafe() {
+  return await droneControlService.configureFailsafe(true)
+}

@@ -27,11 +27,20 @@ import {
   TRANSMISSION_QUALITY_OPTIONS,
 } from './ajustesData.js'
 import { generateAuditExportFile } from '../../services/flightLogService.js'
+import { droneControlService } from '../../services/droneControlService.js'
 import {
   fetchOperatingWindow,
   updateOperatingWindow,
 } from '../../services/settingsService.js'
 import './Ajustes.css'
+
+// Etiquetas UI para el estado de la base de carga (backend: IDLE|DOCKED|CHARGING|CHARGED)
+const CHARGING_BASE_ESTADO_LABEL = {
+  IDLE: 'Base lista en HOME',
+  DOCKED: 'Dron acoplado',
+  CHARGING: 'Carga por inducción activa',
+  CHARGED: 'Carga completa',
+}
 
 /**
  * Pantalla principal del Módulo Ajustes y Edición de Perfil de AeroLuferan
@@ -93,6 +102,48 @@ export default function Ajustes({ initialView = 'main' }) {
       isMounted = false
     }
   }, [])
+
+  // 5. Estación de carga real (GET /drone/charging-base, best-effort)
+  const [chargingBase, setChargingBase] = useState(null)
+  const [isDocking, setIsDocking] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadChargingBase() {
+      try {
+        const status = await droneControlService.getChargingBaseStatus()
+        if (isMounted) setChargingBase(status)
+      } catch {
+        if (isMounted) setChargingBase(null)
+      }
+    }
+    loadChargingBase()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  async function refreshChargingBase() {
+    try {
+      setChargingBase(await droneControlService.getChargingBaseStatus())
+    } catch {
+      setChargingBase(null)
+    }
+  }
+
+  // Ciclo de acoplamiento + recarga (solo ADMIN: POST /drone/charging-base/dock-recharge)
+  async function handleDockAndRecharge() {
+    try {
+      setIsDocking(true)
+      const result = await droneControlService.dockAndRecharge(100)
+      showToast(result?.message || `Recarga completada al ${Math.round(result?.bateria_porcentaje ?? 100)}%`)
+      await refreshChargingBase()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'No se pudo ejecutar el ciclo de recarga.')
+    } finally {
+      setIsDocking(false)
+    }
+  }
 
   // Referencia al input de archivo para cambiar foto
   const fileInputRef = useRef(null)
@@ -629,14 +680,15 @@ export default function Ajustes({ initialView = 'main' }) {
                       {settings.helipads[0]?.name || 'Helipuerto Base Norte #01'}
                     </strong>
                     <p className="ajustes-item__subtitle">
-                      • {settings.helipads[0]?.connectionStatus || 'Conectada'} •{' '}
-                      {settings.helipads[0]?.chargingStatus || 'Carga Inductiva lista'}
+                      {chargingBase
+                        ? `• Conectada • ${CHARGING_BASE_ESTADO_LABEL[chargingBase.estado] || chargingBase.estado}`
+                        : '• Sin conexión con el backend'}
                     </p>
                   </div>
                 </div>
 
                 <span className="heliport-percentage">
-                  {settings.helipads[0]?.batteryLevel || 100}%
+                  {chargingBase ? `${Math.round(chargingBase.bateria_porcentaje)}%` : '—'}
                 </span>
               </div>
             </section>
@@ -939,38 +991,76 @@ export default function Ajustes({ initialView = 'main' }) {
               </button>
             </div>
             <div className="ajustes-modal-body">
-              <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Estación principal:</span>
-                  <strong>{settings.helipads[0]?.name}</strong>
+              {chargingBase ? (
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Estación principal:</span>
+                    <strong>{settings.helipads[0]?.name}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Estado de la base:</span>
+                    <strong style={{ color: '#10b981' }}>
+                      {CHARGING_BASE_ESTADO_LABEL[chargingBase.estado] || chargingBase.estado}
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Batería reportada:</span>
+                    <strong style={{ color: '#00649c' }}>
+                      {Math.round(chargingBase.bateria_porcentaje)}%
+                    </strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Radio de acoplamiento:</span>
+                    <span>{chargingBase.dock_radius_m} m alrededor de HOME</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Distancia a HOME:</span>
+                    <span>
+                      {chargingBase.distancia_home_m != null
+                        ? `${Number(chargingBase.distancia_home_m).toFixed(1)} m`
+                        : '—'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Ciclos de recarga completados:</span>
+                    <span>{chargingBase.ciclos_completados ?? 0}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Último acoplamiento:</span>
+                    <span>
+                      {chargingBase.ultimo_acoplamiento_at
+                        ? new Date(chargingBase.ultimo_acoplamiento_at).toLocaleString('es-MX')
+                        : 'Sin registros'}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Conexión de telemetría:</span>
-                  <strong style={{ color: '#10b981' }}>✓ Conectada y calibrada</strong>
+              ) : (
+                <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '14px', border: '1px solid #e2e8f0', fontSize: '13px', color: '#64748b' }}>
+                  Sin conexión con el backend — no se pudo consultar el estado de la
+                  estación de carga (GET /drone/charging-base).
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Pad de carga por inducción:</span>
-                  <strong style={{ color: '#00649c' }}>Lista (100% Carga)</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Voltaje de salida:</span>
-                  <span>{settings.helipads[0]?.voltage || '48.2 V'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Domo protector:</span>
-                  <span>{settings.helipads[0]?.domeStatus || 'Abierto / Listo'}</span>
-                </div>
-              </div>
+              )}
               <p style={{ fontSize: '12px', color: '#64748b' }}>
-                Preparado para la alternancia automática entre Helipuerto Base Norte y Helipuerto Base Sur según la autonomía del dron.
+                La recarga por inducción requiere que el dron esté aterrizado dentro
+                del radio de acoplamiento del punto HOME.
               </p>
             </div>
-            <div className="ajustes-modal-actions">
+            <div className="ajustes-modal-actions" style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn-ajustes-modal-cancel"
+                onClick={handleDockAndRecharge}
+                disabled={isDocking || !chargingBase}
+                style={{ flex: 1 }}
+                title={chargingBase ? 'Acoplar y cargar la batería al 100%' : 'Requiere conexión con el backend'}
+              >
+                {isDocking ? 'Acoplando…' : 'Acoplar y recargar'}
+              </button>
               <button
                 type="button"
                 className="btn-ajustes-modal-cancel"
                 onClick={() => setIsHeliportModalOpen(false)}
-                style={{ width: '100%', flex: 'none' }}
+                style={{ flex: 1 }}
               >
                 Cerrar
               </button>

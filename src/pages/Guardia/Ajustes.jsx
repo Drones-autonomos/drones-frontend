@@ -24,7 +24,16 @@ import {
   TRANSMISSION_QUALITY_OPTIONS,
 } from '../Admin/ajustesData.js'
 import { fetchOperatingWindow } from '../../services/settingsService.js'
+import { droneControlService } from '../../services/droneControlService.js'
 import './Ajustes.css'
+
+// Etiquetas UI para el estado de la base de carga (backend: IDLE|DOCKED|CHARGING|CHARGED)
+const CHARGING_BASE_ESTADO_LABEL = {
+  IDLE: 'Base lista en HOME',
+  DOCKED: 'Dron acoplado',
+  CHARGING: 'Carga por inducción activa',
+  CHARGED: 'Carga completa',
+}
 
 /**
  * Pantalla principal del Módulo Ajustes del Perfil Guardia de AeroLuferan.
@@ -94,6 +103,25 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
     fetchOperatingWindow().then((cfg) => {
       if (isMounted && cfg) setOperatingWindow(cfg)
     })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // 5. Estación de carga real (GET /drone/charging-base, best-effort; GUARDIA solo consulta)
+  const [chargingBase, setChargingBase] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadChargingBase() {
+      try {
+        const status = await droneControlService.getChargingBaseStatus()
+        if (isMounted) setChargingBase(status)
+      } catch {
+        if (isMounted) setChargingBase(null)
+      }
+    }
+    loadChargingBase()
     return () => {
       isMounted = false
     }
@@ -530,14 +558,15 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
                       {settings.helipads[0]?.name || 'Helipuerto Base Norte #01'}
                     </strong>
                     <p className="ajustes-item__subtitle">
-                      • {settings.helipads[0]?.connectionStatus || 'Conectada'} •{' '}
-                      {settings.helipads[0]?.chargingStatus || 'Carga Inductiva lista'}
+                      {chargingBase
+                        ? `• Conectada • ${CHARGING_BASE_ESTADO_LABEL[chargingBase.estado] || chargingBase.estado}`
+                        : '• Sin conexión con el backend'}
                     </p>
                   </div>
                 </div>
 
                 <span className="heliport-percentage">
-                  {settings.helipads[0]?.batteryLevel || 100}%
+                  {chargingBase ? `${Math.round(chargingBase.bateria_porcentaje)}%` : '—'}
                 </span>
               </div>
             </section>
@@ -773,18 +802,40 @@ export default function GuardiaAjustes({ initialView = 'main' }) {
               </button>
             </div>
             <div className="ajustes-modal-body">
-              {settings.helipads.map((pad) => (
-                <div key={pad.id} className="modal-session-detail" style={{ marginBottom: '8px' }}>
+              {chargingBase ? (
+                <div className="modal-session-detail" style={{ marginBottom: '8px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '14px', color: '#0f172a' }}>{pad.name}</strong>
-                    <span style={{ color: '#0284c7', fontWeight: '800' }}>{pad.batteryLevel}%</span>
+                    <strong style={{ fontSize: '14px', color: '#0f172a' }}>
+                      {settings.helipads[0]?.name || 'Estación de carga en HOME'}
+                    </strong>
+                    <span style={{ color: '#0284c7', fontWeight: '800' }}>
+                      {Math.round(chargingBase.bateria_porcentaje)}%
+                    </span>
                   </div>
-                  <span>Enlace: {pad.connectionStatus}</span>
-                  <span>Carga: {pad.chargingStatus}</span>
-                  <span>Cúpula protectora: {pad.domeStatus}</span>
-                  <span>Voltaje de salida: {pad.voltage} · Temp: {pad.temperature}</span>
+                  <span>
+                    Estado: {CHARGING_BASE_ESTADO_LABEL[chargingBase.estado] || chargingBase.estado}
+                  </span>
+                  <span>Radio de acoplamiento: {chargingBase.dock_radius_m} m en HOME</span>
+                  <span>
+                    Distancia a HOME:{' '}
+                    {chargingBase.distancia_home_m != null
+                      ? `${Number(chargingBase.distancia_home_m).toFixed(1)} m`
+                      : '—'}
+                  </span>
+                  <span>Ciclos de recarga completados: {chargingBase.ciclos_completados ?? 0}</span>
+                  <span>
+                    Último acoplamiento:{' '}
+                    {chargingBase.ultimo_acoplamiento_at
+                      ? new Date(chargingBase.ultimo_acoplamiento_at).toLocaleString('es-MX')
+                      : 'Sin registros'}
+                  </span>
                 </div>
-              ))}
+              ) : (
+                <div className="modal-session-detail" style={{ marginBottom: '8px', color: '#64748b' }}>
+                  Sin conexión con el backend — no se pudo consultar el estado de la
+                  estación de carga (GET /drone/charging-base).
+                </div>
+              )}
             </div>
             <div className="ajustes-modal-actions">
               <button

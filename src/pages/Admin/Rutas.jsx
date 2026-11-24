@@ -33,6 +33,7 @@ import {
   listMissions,
   startMission,
   cancelMission,
+  confirmMissionLanded,
   MISSIONS_UPDATED_EVENT,
 } from '../../services/missionService.js'
 import {
@@ -107,7 +108,10 @@ export default function Rutas() {
     window.addEventListener(MISSIONS_UPDATED_EVENT, syncData)
     window.addEventListener('aeroluferan_geofences_updated', syncData)
     window.addEventListener('aeroluferan_autonomous_updated', syncData)
-    const intervalId = window.setInterval(() => loadMissions({ silent: true }), 20000)
+    const intervalId = window.setInterval(() => {
+      loadMissions({ silent: true })
+      syncGeofences()
+    }, 20000)
     return () => {
       window.clearTimeout(initialTimer)
       window.removeEventListener('storage', syncData)
@@ -273,6 +277,34 @@ export default function Rutas() {
       setFlightStatusMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'No se pudo cancelar la misión.',
+      })
+    } finally {
+      setPendingActionId(null)
+    }
+  }
+
+  // Edición de misión PROGRAMADA (PUT /missions/{id} en ProgramarRuta)
+  function handleEditMission(mission, event) {
+    event?.stopPropagation?.()
+    navigate('/admin/programar-ruta', { state: { editMission: mission } })
+  }
+
+  // Confirmación de aterrizaje tras interrupción (RECUPERACION → FINALIZADA)
+  async function handleConfirmLanded(mission, event) {
+    event?.stopPropagation?.()
+    setFlightStatusMessage(null)
+    try {
+      setPendingActionId(mission.id)
+      const landed = await confirmMissionLanded(mission.id)
+      setFlightStatusMessage({
+        type: 'success',
+        text: `Aterrizaje de "${landed.name}" confirmado — misión ${landed.estado}.`,
+      })
+      await loadMissions({ silent: true })
+    } catch (error) {
+      setFlightStatusMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'No se pudo confirmar el aterrizaje.',
       })
     } finally {
       setPendingActionId(null)
@@ -648,6 +680,17 @@ export default function Rutas() {
                         >
                           {mission.statusBadge || mission.status.toUpperCase()}
                         </span>
+                        {mission.estado === 'PROGRAMADA' && (
+                          <button
+                            type="button"
+                            className="vuelo-cancel-btn"
+                            disabled={pendingActionId === mission.id}
+                            onClick={(e) => handleEditMission(mission, e)}
+                            title="Editar misión programada"
+                          >
+                            Editar
+                          </button>
+                        )}
                         {['PROGRAMADA', 'EN_CURSO'].includes(mission.estado) && (
                           <button
                             type="button"
@@ -657,6 +700,17 @@ export default function Rutas() {
                             title={mission.estado === 'EN_CURSO' ? 'Cancelar ejecución (RTL)' : 'Cancelar misión'}
                           >
                             {pendingActionId === mission.id ? '…' : 'Cancelar'}
+                          </button>
+                        )}
+                        {mission.estado === 'RECUPERACION' && (
+                          <button
+                            type="button"
+                            className="vuelo-cancel-btn"
+                            disabled={pendingActionId === mission.id}
+                            onClick={(e) => handleConfirmLanded(mission, e)}
+                            title="Confirmar que el dron aterrizó y liberar la reserva"
+                          >
+                            {pendingActionId === mission.id ? '…' : 'Confirmar aterrizaje'}
                           </button>
                         )}
                       </div>

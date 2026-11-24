@@ -29,6 +29,28 @@ export function getSnapshotUrl() {
 }
 
 /**
+ * Captura el último frame del stream y lo descarga como evidencia JPEG.
+ * El archivo se nombra captura-AAAAMMDD-HHMMSS.jpg.
+ */
+export async function captureSnapshotFrame() {
+  const blob = await apiClient.get('/video/snapshot', {
+    responseType: 'blob',
+    skipAuthRedirect: true,
+  })
+  const now = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const stamp =
+    `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
+    `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `captura-${stamp}.jpg`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+/**
  * Indica si el stream reporta señal activa según stream-info.
  * El backend expone /video/live solo cuando hay frames publicados.
  */

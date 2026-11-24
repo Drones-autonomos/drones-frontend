@@ -446,6 +446,37 @@
   stroke-width: 2.4;
 }
 
+.preview-capture {
+  position: absolute;
+  right: 96px;
+  bottom: 22px;
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(50 56 13 / 70%);
+  cursor: pointer;
+}
+
+.preview-capture:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.preview-capture svg {
+  width: 29px;
+  height: 29px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+}
+
+.preview-capture:focus-visible,
 .preview-fullscreen:focus-visible,
 .drone-action:focus-visible {
   outline: 3px solid #007eb4;
@@ -972,6 +1003,18 @@
   }
 
   .preview-fullscreen svg {
+    width: 21px;
+    height: 21px;
+  }
+
+  .preview-capture {
+    right: 63px;
+    bottom: 11px;
+    width: 41px;
+    height: 41px;
+  }
+
+  .preview-capture svg {
     width: 21px;
     height: 21px;
   }

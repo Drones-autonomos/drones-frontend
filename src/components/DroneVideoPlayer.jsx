@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import campusReference from '../assets/campus-reference.svg'
+import { captureSnapshotFrame } from '../services/videoService.js'
 import {
+  CameraIcon,
   CompassIcon,
   CompressIcon,
   ExpandIcon,
@@ -26,7 +28,8 @@ export function DroneVideoPlayer({
   const containerRef = useRef(null)
   const videoRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [fullscreenError, setFullscreenError] = useState('')
+  const [playerMessage, setPlayerMessage] = useState('')
+  const [isCapturing, setIsCapturing] = useState(false)
 
   // Conectar el MediaStream de WebRTC al elemento HTML5 video cuando esté disponible
   useEffect(() => {
@@ -53,18 +56,32 @@ export function DroneVideoPlayer({
 
   async function toggleFullscreen() {
     try {
-      setFullscreenError('')
+      setPlayerMessage('')
       if (document.fullscreenElement) {
         await document.exitFullscreen()
       } else if (containerRef.current?.requestFullscreen) {
         await containerRef.current.requestFullscreen()
       } else {
-        setFullscreenError('La pantalla completa no está soportada en este navegador.')
+        setPlayerMessage('La pantalla completa no está soportada en este navegador.')
       }
     } catch (err) {
-      setFullscreenError(
+      setPlayerMessage(
         err instanceof Error ? err.message : 'No se pudo cambiar el modo de pantalla completa.',
       )
+    }
+  }
+
+  async function handleCaptureSnapshot() {
+    try {
+      setIsCapturing(true)
+      setPlayerMessage('')
+      await captureSnapshotFrame()
+    } catch (err) {
+      setPlayerMessage(
+        err instanceof Error ? err.message : 'No se pudo capturar la evidencia del video.',
+      )
+    } finally {
+      setIsCapturing(false)
     }
   }
 
@@ -152,6 +169,20 @@ export function DroneVideoPlayer({
           <span className="preview-reading">{preview.tilt}</span>
         </div>
 
+        {/* Botón de captura de evidencia (solo con señal MJPEG activa) */}
+        {isLive && streamUrl && (
+          <button
+            className="preview-capture"
+            type="button"
+            aria-label="Capturar evidencia del frame actual"
+            title="Capturar evidencia"
+            disabled={isCapturing}
+            onClick={handleCaptureSnapshot}
+          >
+            <CameraIcon />
+          </button>
+        )}
+
         {/* Botón de pantalla completa / regresar a vista normal */}
         <button
           className="preview-fullscreen"
@@ -167,9 +198,9 @@ export function DroneVideoPlayer({
         </button>
       </div>
 
-      {fullscreenError && (
+      {playerMessage && (
         <p className="preview-message" role="status">
-          {fullscreenError}
+          {playerMessage}
         </p>
       )}
     </section>

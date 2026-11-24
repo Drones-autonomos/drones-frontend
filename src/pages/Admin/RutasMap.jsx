@@ -86,14 +86,28 @@ export default function RutasMap({
       const strokeColor = isRestricted ? '#ef4444' : isWarning ? '#f59e0b' : '#0284c7'
       const fillColor = isRestricted ? '#ef4444' : isWarning ? '#f59e0b' : '#0284c7'
 
-      const rect = L.rectangle(zone.bounds, {
+      const shapeStyle = {
         color: strokeColor,
         weight: 2.2,
         dashArray: '6, 6',
         fillColor: fillColor,
         fillOpacity: 0.12,
         interactive: true,
-      })
+      }
+
+      // Geometría real según el tipo de zona: círculo (CIRCULAR del backend),
+      // polígono (vértices exactos) o rectángulo envolvente (fallback local).
+      let rect
+      if (zone.circulo?.centro && zone.circulo.radioMetros > 0) {
+        rect = L.circle(zone.circulo.centro, {
+          ...shapeStyle,
+          radius: zone.circulo.radioMetros,
+        })
+      } else if (Array.isArray(zone.poligono) && zone.poligono.length >= 3) {
+        rect = L.polygon(zone.poligono, shapeStyle)
+      } else {
+        rect = L.rectangle(zone.bounds, shapeStyle)
+      }
 
       rect.bindTooltip(
         `<strong>${zone.name}</strong><br/>Tipo: ${zone.type}${zone.restrictionReason ? `<br/><em>${zone.restrictionReason}</em>` : ''}`,

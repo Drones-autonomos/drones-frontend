@@ -10,7 +10,7 @@ const POLL_INTERVAL_MS = 4000
 /**
  * Hook para consumir el stream MJPEG del backend (/video/live).
  * Consulta /video/stream-info periódicamente y expone el estado
- * con la misma forma que esperaba useWebRTCStream.
+ * de conexión para DroneVideoPlayer.
  * Reutilizable por Admin y Guardia.
  */
 export function useLiveVideoStream() {

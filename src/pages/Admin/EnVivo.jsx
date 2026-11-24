@@ -13,6 +13,7 @@ import {
   PlaneIcon,
   PlayIcon,
   SatelliteIcon,
+  ShieldIcon,
   SignalIcon,
   StopIcon,
   WindIcon,
@@ -20,6 +21,7 @@ import {
 import useDroneTelemetry from '../../hooks/useDroneTelemetry.js'
 import useLiveVideoStream from '../../hooks/useLiveVideoStream.js'
 import {
+  requestArmFailsafe,
   requestEmergencyStop,
   requestPauseFlight,
   requestResumeFlight,
@@ -67,7 +69,7 @@ function TelemetryCard({ item }) {
   )
 }
 
-function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onRequestEmergencyStop, actionMessage }) {
+function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onArmFailsafe, onRequestEmergencyStop, actionMessage }) {
   return (
     <section className="quick-actions" aria-labelledby="quick-actions-title">
       <div className="quick-actions__heading">
@@ -95,6 +97,17 @@ function QuickActions({ mode, isPaused, onTogglePause, onReturnToBase, onRequest
             <HomeIcon />
           </span>
           <span>Volver a Base</span>
+        </button>
+
+        <button
+          className="drone-action"
+          type="button"
+          onClick={onArmFailsafe}
+        >
+          <span className="drone-action__icon">
+            <ShieldIcon />
+          </span>
+          <span>Armar Failsafe GCS</span>
         </button>
 
         <button
@@ -179,6 +192,20 @@ function EnVivo() {
     }
   }
 
+  async function handleArmFailsafe() {
+    try {
+      setActionMessage('')
+      const result = await requestArmFailsafe()
+      setActionMessage(
+        result?.message || 'Failsafe GCS armado: el dron volverá a base si pierde el enlace.',
+      )
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : 'No se pudo armar el failsafe GCS.',
+      )
+    }
+  }
+
   async function handleConfirmEmergencyStop() {
     try {
       setIsEmergencyStopping(true)
@@ -250,6 +277,7 @@ function EnVivo() {
           isPaused={isPaused}
           onTogglePause={handleTogglePause}
           onReturnToBase={handleReturnToBase}
+          onArmFailsafe={handleArmFailsafe}
           onRequestEmergencyStop={() => setIsEmergencyModalOpen(true)}
           actionMessage={actionMessage}
         />

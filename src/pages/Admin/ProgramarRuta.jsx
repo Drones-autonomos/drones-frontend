@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import AdminBottomNav from '../../components/AdminBottomNav.jsx'
 import {
   BackArrowIcon,
@@ -20,7 +20,8 @@ import {
   initialChecklistData,
   validateRouteAgainstGeofences,
 } from './rutasData.js'
-import { createMission } from '../../services/missionService.js'
+import { createMission, updateMission } from '../../services/missionService.js'
+import { validatePointAgainstGeofences } from '../../services/geofenceService.js'
 import './ProgramarRuta.css'
 
 // Waypoints iniciales de demostración acordes al trayecto E2 -> A de la captura
@@ -43,15 +44,37 @@ const DAYS_OF_WEEK = [
 
 export default function ProgramarRuta() {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Modo edición: Rutas.jsx navega con state.editMission (solo PROGRAMADA).
+  // PUT /missions/{id} solo acepta nombre/descripcion/horario — los waypoints
+  // se muestran en el mapa como referencia pero no son editables.
+  const editMission = location.state?.editMission || null
+  const isEditMode = Boolean(editMission?.id)
+
+  const editSchedule = useMemo(() => {
+    const raw = editMission?.horario_inicio_programado
+    if (!raw) return null
+    const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)
+    const date = new Date(hasZone ? raw : `${raw}Z`)
+    if (Number.isNaN(date.getTime())) return null
+    const pad = (n) => String(n).padStart(2, '0')
+    return {
+      date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+      time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+    }
+  }, [editMission])
 
   // 1. Checklist de Vuelo Aprobado (datos de telemetría de demostración preparados para backend)
   const [checklist] = useState(initialChecklistData)
 
   // 2. Nombre de la misión
-  const [missionName, setMissionName] = useState('Circuito Coliseo')
+  const [missionName, setMissionName] = useState(editMission?.name || 'Circuito Coliseo')
 
   // 3. Waypoints y mapa interactivo
-  const [waypoints, setWaypoints] = useState(INITIAL_DEMO_WAYPOINTS)
+  const [waypoints, setWaypoints] = useState(
+    editMission?.waypoints?.length >= 2 ? editMission.waypoints : INITIAL_DEMO_WAYPOINTS,
+  )
   const [geofences] = useState(getStoredGeofences)
 
   // 4. Altura operativa (30m a 200m AGL)
@@ -62,8 +85,8 @@ export default function ProgramarRuta() {
 
   // 6. Planificación de vuelo (Fechas, horarios y helipuertos)
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
-  const [departureDate, setDepartureDate] = useState(todayStr)
-  const [departureTime, setDepartureTime] = useState('18:30')
+  const [departureDate, setDepartureDate] = useState(editSchedule?.date || todayStr)
+  const [departureTime, setDepartureTime] = useState(editSchedule?.time || '18:30')
   const [departureHelipad, setDepartureHelipad] = useState(HELIPUERTOS[0])
 
   const [arrivalDate, setArrivalDate] = useState(todayStr)
@@ -180,6 +203,22 @@ export default function ProgramarRuta() {
       return
     }
 
+    // 5. Pre-validación en backend: cada waypoint debe caer dentro de alguna
+    // geocerca activa (POST /geofences/validate-point). Si el backend no
+    // responde (null) se continúa y el servidor valida en el POST final.
+    if (!isEditMode) {
+      for (let i = 0; i < waypoints.length; i += 1) {
+        const [lat, lon] = waypoints[i]
+        const verdict = await validatePointAgainstGeofences(lat, lon, operatingHeight)
+        if (verdict && verdict.permitido === false) {
+          setFormError(
+            `El waypoint ${i + 1} (${Number(lat).toFixed(5)}, ${Number(lon).toFixed(5)}) fue rechazado por el servidor: ${verdict.motivo || 'fuera de las zonas operativas autorizadas'}.`,
+          )
+          return
+        }
+      }
+    }
+
     // Descripción con metadatos de la planificación (el backend solo guarda
     // nombre/descripcion/horario; la zona, frecuencia y duración viajan aquí)
     const zone = departureHelipad.includes('Norte') ? 'Zona Norte' : 'Zona Central'
@@ -193,13 +232,22 @@ export default function ProgramarRuta() {
 
     try {
       setIsSaving(true)
-      await createMission({
-        nombre: missionName,
-        descripcion,
-        horarioInicio: `${departureDate}T${departureTime}:00`,
-        waypoints,
-        altitudMetros: operatingHeight,
-      })
+      if (isEditMode) {
+        // PUT /missions/{id}: el backend no admite editar waypoints
+        await updateMission(editMission.id, {
+          nombre: missionName,
+          descripcion,
+          horarioInicio: `${departureDate}T${departureTime}:00`,
+        })
+      } else {
+        await createMission({
+          nombre: missionName,
+          descripcion,
+          horarioInicio: `${departureDate}T${departureTime}:00`,
+          waypoints,
+          altitudMetros: operatingHeight,
+        })
+      }
       setSaveSuccess(true)
 
       // Regresar a la interfaz Rutas tras breve confirmación visual
@@ -240,7 +288,9 @@ export default function ProgramarRuta() {
           >
             <BackArrowIcon size={18} color="#0284c7" />
           </button>
-          <h2 className="programar-subhead-title">Programar Nueva Ruta</h2>
+          <h2 className="programar-subhead-title">
+            {isEditMode ? `Editar misión · ${editMission.name}` : 'Programar Nueva Ruta'}
+          </h2>
         </div>
 
         <main className="programar-content">
@@ -308,7 +358,7 @@ export default function ProgramarRuta() {
                 geofences={geofences}
                 waypoints={waypoints}
                 onWaypointsChange={setWaypoints}
-                allowWaypointEditing={true}
+                allowWaypointEditing={!isEditMode}
                 tileMode="streets"
               />
 
@@ -329,6 +379,14 @@ export default function ProgramarRuta() {
                 </div>
               </div>
             </div>
+
+            {isEditMode && (
+              <div className="waypoint-warning-box" role="note">
+                <strong>ℹ️ Edición de misión:</strong> Los waypoints no se pueden modificar
+                (el backend solo permite actualizar nombre, descripción y horario en una
+                misión PROGRAMADA).
+              </div>
+            )}
 
             {/* Advertencia si la trayectoria propuesta cruza una geocerca */}
             {routeValidation.conflicts.length > 0 && (
@@ -479,7 +537,9 @@ export default function ProgramarRuta() {
 
           {saveSuccess && (
             <div className="programar-feedback-success" role="status">
-              ✓ ¡Misión programada exitosamente! Guardando en Rutas...
+              ✓ {isEditMode
+                ? '¡Misión actualizada exitosamente! Volviendo a Rutas...'
+                : '¡Misión programada exitosamente! Guardando en Rutas...'}
             </div>
           )}
 
@@ -492,7 +552,11 @@ export default function ProgramarRuta() {
             onClick={handleProgramarVuelo}
             disabled={isSaving}
           >
-            {isSaving ? 'Guardando misión…' : 'Programar vuelo'}
+            {isSaving
+              ? 'Guardando misión…'
+              : isEditMode
+                ? 'Guardar cambios'
+                : 'Programar vuelo'}
           </button>
         </main>
 

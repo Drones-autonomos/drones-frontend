@@ -8,6 +8,7 @@ import campusVespertino from '../../assets/campus-vespertino.svg'
 import campusReference from '../../assets/campus-reference.svg'
 
 export const BITACORA_STORAGE_KEY = 'aeroluferan_bitacora_flights'
+export const BITACORA_SYNCED_KEY = 'aeroluferan_bitacora_synced'
 export const MAX_RETENTION_DAYS = 30
 
 /**
@@ -813,8 +814,13 @@ export function getStoredFlights() {
     const raw = localStorage.getItem(BITACORA_STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed
+      if (Array.isArray(parsed)) {
+        // Tras la primera sincronización con el backend, un listado vacío
+        // es un resultado válido (sin vuelos reales registrados); los datos
+        // demo solo aplican cuando nunca se sincronizó.
+        if (parsed.length > 0 || localStorage.getItem(BITACORA_SYNCED_KEY)) {
+          return parsed
+        }
       }
     }
   } catch (error) {

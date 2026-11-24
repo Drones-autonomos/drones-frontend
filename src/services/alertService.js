@@ -20,153 +20,9 @@ export const ALERTS_CHANGED_EVENT = 'aeroluferan_alerts_changed'
 const ALERTS_OVERLAY_KEY = 'aeroluferan_alerts_overlay'
 const SYNC_INTERVAL_MS = 15000
 const WS_RECONNECT_MS = 5000
+const ALERTS_PAGE_SIZE = 100
+const ALERTS_MAX_FETCH = 500
 
-export const INITIAL_DEMO_ALERTS = [
-  {
-    id: 'vanguard-01',
-    droneId: 'Vanguard-01',
-    droneName: 'Vanguard-01',
-    badgeNumber: '1',
-    badgeType: 'number',
-    type: 'humo', // Filtro: Humo / Fuego
-    severity: 'critical', // Alerta crítica
-    severityLabel: 'ALERTA CRÍTICA',
-    age: 'Hace 5 min',
-    location: 'Edificio B · Laboratorio',
-    detection: 'Detección Térmica: 88°C',
-    detectionType: 'thermal',
-    confidence: 'IA 96.4%',
-    coordinates: '19.3324° N, 99.1872° W',
-    altitude: 'Alt: 38m',
-    timestamp: '22:45 hrs',
-    image: alertVanguard01,
-    incidentTitle: 'Posible inicio de conato de incendio',
-    description:
-      'El dron identificó una columna de humo denso con anomalía de calor sobre la ventilación secundaria. Zona sensible por almacenamiento contiguo de solventes orgánicos.',
-    audit: null,
-    dispatchButtonTheme: 'critical',
-    status: 'Pendiente',
-    attentionStatus: 'Pendiente',
-    viewedBy: {
-      guard: false,
-      admin: false,
-    },
-    dismissedBy: {
-      guard: false,
-      admin: false,
-    },
-    telemetry: {
-      droneId: 'Vanguard-01',
-      battery: '84%',
-      altitude: '38m',
-      windSpeed: '12 km/h',
-      gps: '19.3324° N, 99.1872° W',
-      heading: '142° SE',
-      tilt: '3°',
-      captureTime: '22:45:10 hrs',
-      streamStatus: 'En patrullaje activo',
-    },
-    auditTrail: [],
-  },
-  {
-    id: 'vanguard-02',
-    droneId: 'Vanguard-02',
-    droneName: 'Vanguard-02',
-    badgeNumber: '?',
-    badgeType: 'question',
-    type: 'intruso', // Filtro: Intrusos
-    severity: 'medium', // Alerta media
-    severityLabel: 'ALERTA MEDIA',
-    age: 'Hace 18 min',
-    location: 'Estacionamiento Docente Poniente',
-    detection: 'Sujeto en movimiento',
-    detectionType: 'motion',
-    confidence: 'IA 94.0%',
-    coordinates: 'Acceso Puerta 3',
-    altitude: 'N/A',
-    timestamp: '22:12 hrs',
-    image: alertVanguard02,
-    incidentTitle: 'Persona no autorizada fuera de horario',
-    description:
-      'Se detectó a una persona sin credencial activa transitando entre vehículos luego del horario permitido (cierre 21:30 hrs).',
-    audit: {
-      text: 'Registro Criptográfico Inmutable',
-      code: '#8F4C-A03E',
-    },
-    dispatchButtonTheme: 'dark',
-    status: 'Pendiente',
-    attentionStatus: 'Pendiente',
-    viewedBy: {
-      guard: false,
-      admin: false,
-    },
-    dismissedBy: {
-      guard: false,
-      admin: false,
-    },
-    telemetry: {
-      droneId: 'Vanguard-02',
-      battery: '72%',
-      altitude: '25m',
-      windSpeed: '10 km/h',
-      gps: '19.3315° N, 99.1865° W',
-      heading: '085° E',
-      tilt: '1.5°',
-      captureTime: '22:12:04 hrs',
-      streamStatus: 'En patrullaje activo',
-    },
-    auditTrail: [],
-  },
-  {
-    id: 'vanguard-03',
-    droneId: 'Vanguard-03',
-    droneName: 'Vanguard-03',
-    badgeNumber: '2',
-    badgeType: 'number',
-    type: 'intruso', // Filtro: Intrusos
-    severity: 'medium',
-    severityLabel: 'ALERTA MEDIA',
-    age: 'Hace 28 min',
-    location: 'Acceso Perimetral Norte · Geocerca 2',
-    detection: 'Movimiento en zona restringida',
-    detectionType: 'motion',
-    confidence: 'IA 91.8%',
-    coordinates: '19.3338° N, 99.1855° W',
-    altitude: 'Alt: 30m',
-    timestamp: '21:58 hrs',
-    image: alertVanguard02,
-    incidentTitle: 'Cruce no autorizado de perímetro',
-    description:
-      'Se detectó silueta en movimiento traspasando la delimitación perimetral exterior hacia el área deportiva luego del horario habilitado.',
-    audit: {
-      text: 'Registro Criptográfico Inmutable',
-      code: '#9B1A-D421',
-    },
-    dispatchButtonTheme: 'dark',
-    status: 'Pendiente',
-    attentionStatus: 'Pendiente',
-    viewedBy: {
-      guard: false,
-      admin: false,
-    },
-    dismissedBy: {
-      guard: false,
-      admin: false,
-    },
-    telemetry: {
-      droneId: 'Vanguard-03',
-      battery: '65%',
-      altitude: '30m',
-      windSpeed: '14 km/h',
-      gps: '19.3338° N, 99.1855° W',
-      heading: '210° SW',
-      tilt: '2°',
-      captureTime: '21:58:30 hrs',
-      streamStatus: 'En patrullaje activo',
-    },
-    auditTrail: [],
-  },
-]
 
 /* ==========================================================================
    Estado del repositorio, overlay local y sincronización con el backend
@@ -380,6 +236,24 @@ export function getAlertsSyncState() {
   return syncState
 }
 
+/* El backend limita cada página a ALERTS_PAGE_SIZE; se recorren páginas
+   hasta agotar el historial o alcanzar ALERTS_MAX_FETCH. */
+async function fetchAllAlerts() {
+  const collected = []
+  let skip = 0
+  while (collected.length < ALERTS_MAX_FETCH) {
+    const page = await apiClient.get('/alerts/', {
+      query: { skip, limit: ALERTS_PAGE_SIZE },
+      skipAuthRedirect: true,
+    })
+    const items = Array.isArray(page) ? page : []
+    collected.push(...items)
+    if (items.length < ALERTS_PAGE_SIZE) break
+    skip += ALERTS_PAGE_SIZE
+  }
+  return collected
+}
+
 export async function syncAlertsFromBackend() {
   if (!getAuthToken()) {
     syncState = 'unauthenticated'
@@ -387,10 +261,7 @@ export async function syncAlertsFromBackend() {
   }
   syncState = 'syncing'
   try {
-    const list = await apiClient.get('/alerts/', {
-      query: { limit: 100 },
-      skipAuthRedirect: true,
-    })
+    const list = await fetchAllAlerts()
     const details = await Promise.all(
       (list || []).map((a) =>
         apiClient
